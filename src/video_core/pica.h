@@ -1237,6 +1237,8 @@ struct Regs {
             }
 
             union {
+                u32 setup;
+
                 // Index of the next uniform to write to
                 // TODO: ctrulib uses 8 bits for this, however that seems to yield lots of invalid indices
                 // TODO: Maybe the uppermost index is for the geometry shader? Investigate!
