@@ -21,6 +21,7 @@
 
 #include "video_core/pica.h"
 #include "video_core/pica_types.h"
+#include "video_core/primitive_assembly.h"
 
 using nihstro::RegisterType;
 using nihstro::SourceRegister;
@@ -285,6 +286,17 @@ struct UnitState {
     } registers;
     static_assert(std::is_pod<Registers>::value, "Structure is not POD");
 
+    OutputRegisters emit_buffers[3]; //TODO: 3dbrew suggests this only stores the first 7 output registers
+
+    union EmitParameters {
+        u32 raw;
+        BitField<22, 1, u32> winding;
+        BitField<23, 1, u32> primitive_emit;
+        BitField<24, 2, u32> vertex_id;
+    } emit_params;
+
+    PrimitiveAssembler<OutputVertex>::TriangleHandler emit_triangle_callback;
+
     OutputRegisters output_registers;
 
     bool conditional_code[2];
@@ -321,6 +333,10 @@ struct UnitState {
             UNREACHABLE();
             return 0;
         }
+    }
+
+    static size_t EmitParamsOffset() {
+        return offsetof(UnitState, emit_params.raw);
     }
 };
 
@@ -400,6 +416,9 @@ void WriteProgramCodeOffset(bool gs, u32 value);
 void WriteProgramCode(bool gs, u32 value);
 void WriteSwizzlePatternsOffset(bool gs, u32 value);
 void WriteSwizzlePatterns(bool gs, u32 value);
+
+template<bool Debug>
+void HandleEMIT(UnitState<Debug>& state);
 
 } // namespace Shader
 
