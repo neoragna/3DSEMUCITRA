@@ -334,7 +334,7 @@ struct CTRAddrInfo {
     u32                 ai_addr; //CTRSockAddr*
     u32                 ai_next; //CTRAddrInfo*
 
-    static addrinfo ToPlatform(CTRAddrInfo const& ctr_info) {
+    static addrinfo ToPlatform(const CTRAddrInfo& ctr_info) {
         addrinfo result;
         result.ai_flags = ctr_info.ai_flags;
         result.ai_family = ctr_info.ai_family;
@@ -342,12 +342,12 @@ struct CTRAddrInfo {
         result.ai_protocol = ctr_info.ai_protocol;
         result.ai_addrlen = ctr_info.ai_addrlen;
         if(ctr_info.ai_canonname != 0) {
-            result.ai_canonname = ::strdup(reinterpret_cast<char *>(Memory::GetPointer(ctr_info.ai_canonname)));
+            result.ai_canonname = ::strdup(reinterpret_cast<char*>(Memory::GetPointer(ctr_info.ai_canonname)));
         } else {
             result.ai_canonname = nullptr;
         }
 
-        CTRSockAddr* addr = reinterpret_cast<CTRSockAddr *>(Memory::GetPointer(ctr_info.ai_addr));
+        CTRSockAddr* addr = reinterpret_cast<CTRSockAddr*>(Memory::GetPointer(ctr_info.ai_addr));
         if(addr != nullptr) {
             result.ai_addr = new sockaddr();
             sockaddr plat_addr = CTRSockAddr::ToPlatform(*addr);
@@ -359,7 +359,7 @@ struct CTRAddrInfo {
         return result;
     }
 
-    static void FreePlatform(addrinfo const& info) {
+    static void FreePlatform(const addrinfo& info) {
         if(info.ai_canonname != nullptr) {
             delete info.ai_canonname;
         }
@@ -379,7 +379,7 @@ struct CTRAddrInfoBuffer {
     char                ai_canonname[256];
     sockaddr_storage    ai_addr;
 
-    static void FromAddrInfo(addrinfo const& info, CTRAddrInfoBuffer *buffer) {
+    static void FromAddrInfo(const addrinfo& info, CTRAddrInfoBuffer* buffer) {
         buffer->ai_flags = info.ai_flags;
         buffer->ai_family = info.ai_family;
         buffer->ai_socktype = info.ai_socktype;
@@ -878,7 +878,7 @@ static void SetSockOpt(Service::Interface* self) {
 #endif
     } else {
         socklen_t optlen = static_cast<socklen_t>(cmd_buffer[4]);
-        const char* optval = reinterpret_cast<const char *>(Memory::GetPointer(cmd_buffer[8]));
+        const char* optval = reinterpret_cast<const char*>(Memory::GetPointer(cmd_buffer[8]));
 
         ret = static_cast<u32>(::setsockopt(socket_handle, level, optname, optval, optlen));
         err = 0;
@@ -897,12 +897,11 @@ static void GetAddrInfo(Service::Interface* self) {
     u32 buffer_len = cmd_buffer[4]; // count * sizeof(CTRAddrInfoBuffer)
     u32 max_count = buffer_len / sizeof(CTRAddrInfoBuffer);
 
-    char* node = reinterpret_cast<char *>(Memory::GetPointer(cmd_buffer[6]));
-    char* service = reinterpret_cast<char *>(Memory::GetPointer(cmd_buffer[8]));
-    CTRAddrInfo* hints = reinterpret_cast<CTRAddrInfo *>(Memory::GetPointer(cmd_buffer[10]));
-    CTRAddrInfoBuffer* buffer = reinterpret_cast<CTRAddrInfoBuffer *>(Memory::GetPointer(cmd_buffer[0x104 >> 2]));
+    char* node = reinterpret_cast<char*>(Memory::GetPointer(cmd_buffer[6]));
+    char* service = reinterpret_cast<char*>(Memory::GetPointer(cmd_buffer[8]));
+    CTRAddrInfo* hints = reinterpret_cast<CTRAddrInfo*>(Memory::GetPointer(cmd_buffer[10]));
+    CTRAddrInfoBuffer* buffer = reinterpret_cast<CTRAddrInfoBuffer*>(Memory::GetPointer(cmd_buffer[0x104 >> 2]));
 
-    int ret;
     int err = 0;
     int count = 0;
 
@@ -910,15 +909,15 @@ static void GetAddrInfo(Service::Interface* self) {
     addrinfo* res;
     addrinfo plat_hints = CTRAddrInfo::ToPlatform(*hints);
 
-    ret = ::getaddrinfo(node, service, &plat_hints, &results);
+    int ret = ::getaddrinfo(node, service, &plat_hints, &results);
 
     CTRAddrInfo::FreePlatform(plat_hints);
 
-    if(ret == SOCKET_ERROR_VALUE) {
+    if (ret == SOCKET_ERROR_VALUE) {
         err = TranslateError(GET_ERRNO);
     } else {
         res = results;
-        while(res != nullptr && count < max_count) {
+        while (res != nullptr && count < max_count) {
             CTRAddrInfoBuffer::FromAddrInfo(*res, buffer + (count++));
             res = res->ai_next;
         }
@@ -938,15 +937,14 @@ static void GetNameInfo(Service::Interface* self) {
     u32 servlen = cmd_buffer[3];
     u32 flags = cmd_buffer[4];
 
-    CTRSockAddr* tmpaddr = reinterpret_cast<CTRSockAddr *>(Memory::GetPointer(cmd_buffer[6]));
-    char* host = reinterpret_cast<char *>(Memory::GetPointer(cmd_buffer[0x104 >> 2]));
-    char* serv = reinterpret_cast<char *>(Memory::GetPointer(cmd_buffer[0x10C >> 2]));
+    CTRSockAddr* tmpaddr = reinterpret_cast<CTRSockAddr*>(Memory::GetPointer(cmd_buffer[6]));
+    char* host = reinterpret_cast<char*>(Memory::GetPointer(cmd_buffer[0x104 >> 2]));
+    char* serv = reinterpret_cast<char*>(Memory::GetPointer(cmd_buffer[0x10C >> 2]));
 
-    int ret;
     int err = 0;
 
     sockaddr addr = CTRSockAddr::ToPlatform(*tmpaddr);
-    ::getnameinfo(&addr, tmpaddr_len, host, hostlen, serv, servlen, flags);
+    int ret = ::getnameinfo(&addr, tmpaddr_len, host, hostlen, serv, servlen, flags);
 
     cmd_buffer[0] = IPC::MakeHeader(0x10, 4, 2);
     cmd_buffer[1] = ret;
