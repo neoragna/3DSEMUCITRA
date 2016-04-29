@@ -40,15 +40,12 @@ using nihstro::DVLPHeader;
 
 namespace Pica {
 
-void DebugContext::OnEvent(Event event, void* data) {
-    if (!breakpoints[event].enabled)
-        return;
-
+void DebugContext::DoOnEvent(Event event, void* data) {
     {
         std::unique_lock<std::mutex> lock(breakpoint_mutex);
 
-        // Commit the hardware renderer's framebuffer so it will show on debug widgets
-        VideoCore::g_renderer->Rasterizer()->FlushFramebuffer();
+        // Commit the rasterizer's caches so framebuffers, render targets, etc. will show on debug widgets
+        VideoCore::g_renderer->Rasterizer()->FlushAll();
 
         // TODO: Should stop the CPU thread here once we multithread emulation.
 
