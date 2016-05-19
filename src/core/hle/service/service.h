@@ -29,6 +29,7 @@ class Interface : public Kernel::Session {
     // processes.
 public:
     std::string GetName() const override { return GetPortName(); }
+    virtual void SetVersion(u32 raw_version) { version.raw = raw_version; }
 
     typedef void (*Function)(Interface*);
 
@@ -59,6 +60,14 @@ protected:
     }
 
     void Register(const FunctionInfo* functions, size_t n);
+
+    union {
+        u32 raw;
+        BitField< 0, 8, u32> major;
+        BitField< 8, 8, u32> minor;
+        BitField<16, 8, u32> build;
+        BitField<24, 8, u32> revision;
+    } version = {};
 
 private:
     boost::container::flat_map<u32, FunctionInfo> m_functions;
