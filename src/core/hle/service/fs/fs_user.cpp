@@ -684,9 +684,11 @@ static void InitializeWithSdkVersion(Service::Interface* self) {
 
     self->SetVersion(cmd_buff[1]);
 
-    cmd_buff[1] = RESULT_SUCCESS.raw;
+    ASSERT_MSG(cmd_buff[2] == 0x20, "ProcessId Header must be 0x20");
 
-    LOG_WARNING(Service_FS, "(STUBBED) called");
+    LOG_WARNING(Service_FS, "(STUBBED) called, version: 0x%08X", cmd_buff[1]);
+
+    cmd_buff[1] = RESULT_SUCCESS.raw;
 }
 
 /**

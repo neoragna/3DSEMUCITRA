@@ -79,9 +79,9 @@ static void SetClientVersion(Service::Interface* self) {
 
     self->SetVersion(cmd_buff[1]);
 
-    cmd_buff[1] = RESULT_SUCCESS.raw; // No error
+    LOG_WARNING(Service_AC, "(STUBBED) called, version: 0x%08X", cmd_buff[1]);
 
-    LOG_WARNING(Service_AC, "(STUBBED) called");
+    cmd_buff[1] = RESULT_SUCCESS.raw; // No error
 }
 
 const Interface::FunctionInfo FunctionTable[] = {
