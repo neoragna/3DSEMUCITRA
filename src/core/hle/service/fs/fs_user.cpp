@@ -684,11 +684,17 @@ static void InitializeWithSdkVersion(Service::Interface* self) {
 
     self->SetVersion(cmd_buff[1]);
 
-    ASSERT_MSG(cmd_buff[2] == 0x20, "ProcessId Header must be 0x20");
+    if (cmd_buff[2] == IPC::CallingPidDesc()) {
+        LOG_WARNING(Service_FS, "(STUBBED) called, version: 0x%08X", cmd_buff[1]);
 
-    LOG_WARNING(Service_FS, "(STUBBED) called, version: 0x%08X", cmd_buff[1]);
+        cmd_buff[1] = RESULT_SUCCESS.raw;
+    }
+    else {
+        LOG_ERROR(Service_FS, "ProcessId Header must be 0x20");
 
-    cmd_buff[1] = RESULT_SUCCESS.raw;
+        cmd_buff[1] = ResultCode(ErrorDescription::OS_InvalidBufferDescriptor, ErrorModule::OS,
+                                 ErrorSummary::WrongArgument, ErrorLevel::Permanent).raw;
+    }
 }
 
 /**
