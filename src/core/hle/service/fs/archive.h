@@ -80,6 +80,19 @@ public:
 ResultVal<ArchiveHandle> OpenArchive(ArchiveIdCode id_code, FileSys::Path& archive_path);
 
 /**
+ * ControlArchive action 0 : Commits save data changes
+ * @param handle Handle to the archive to control
+ */
+ResultCode CommitSavedata(ArchiveHandle handle);
+
+/**
+ * ControlArchive action 1 : Retrieves a file's last-modified timestamp
+ * @param input_buffer and @param input_size will get a pathname
+ * @param output_buffer and @param output_size : if file exist, return the file timestamp
+ */
+ResultCode GetTimeStamp(u32& input_buffer, u32& input_size, u32& output_buffer, u32& output_size);
+
+/**
  * Closes an archive
  * @param handle Handle to the archive to close
  */

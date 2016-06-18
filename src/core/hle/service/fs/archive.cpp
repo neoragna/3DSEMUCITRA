@@ -15,6 +15,7 @@
 #include "common/common_types.h"
 #include "common/file_util.h"
 #include "common/logging/log.h"
+#include "common/string_util.h"
 
 #include "core/file_sys/archive_backend.h"
 #include "core/file_sys/archive_extsavedata.h"
@@ -292,6 +293,53 @@ ResultVal<ArchiveHandle> OpenArchive(ArchiveIdCode id_code, FileSys::Path& archi
     }
     handle_map.emplace(next_handle, std::move(res));
     return MakeResult<ArchiveHandle>(next_handle++);
+}
+
+bool CheckArchiveHandle(ArchiveHandle handle) {
+    const auto handle_map_end_itr = handle_map.end();
+    for (auto itr = handle_map.begin(); itr != handle_map_end_itr; ++itr) {
+        if (itr->first == handle) {
+            return true;
+        }
+    }
+    return false;
+}
+
+ResultCode CommitSavedata(ArchiveHandle handle) {
+    ResultCode result = RESULT_SUCCESS;
+
+    if (CheckArchiveHandle(handle)) {
+        result = RESULT_SUCCESS;
+    } else {
+        result = ResultCode(ErrorDescription::FS_ArchiveNotMounted,
+            ErrorModule::FS, ErrorSummary::NotFound, ErrorLevel::Status); // 0xC8804465
+    }
+
+    u32 level = result.raw >> 27;
+    if (result.raw & 0x80000000) {
+        level -= 32;
+    }
+    if (level == 0xFFFFFFFF) {
+        LOG_ERROR(Service_FS, "Fatal Error : Invalid operation");
+    }
+    return result;
+}
+
+ResultCode GetTimeStamp(u32& input_buffer, u32& input_size, u32& output_buffer, u32& output_size) {
+    const std::string filepath = Common::UTF16ToUTF8(std::u16string(reinterpret_cast<char16_t*>
+        (Memory::GetPointer(input_buffer), input_size)));
+
+    u64 timestamp = FileUtil::GetFileModificationTimestamp(filepath);
+
+    if (timestamp != 0) {
+        Memory::WriteBlock(output_buffer, &timestamp, output_size);
+        LOG_DEBUG(Service_FS, "timestamp=0x016llX", timestamp);
+        return RESULT_SUCCESS;
+    } else {
+        LOG_ERROR(Service_FS, "File was not exist, filepath :%s", filepath.c_str());
+        return ResultCode(ErrorDescription::FS_NotFound, ErrorModule::FS,
+            ErrorSummary::NotFound, ErrorLevel::Permanent);
+    }
 }
 
 ResultCode CloseArchive(ArchiveHandle handle) {
