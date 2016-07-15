@@ -1680,6 +1680,17 @@ public:
     }
 
     /**
+     * Verifies module hash by CRR.
+     * @param cro_size the size of the CRO
+     * @param crr the virtual address of the CRR
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode VerifyHash(u32 cro_size, VAddr crr) const {
+        // TODO(wwylele): actually verify the hash
+        return RESULT_SUCCESS;
+    }
+
+    /**
      * Links this module with all registered auto-link module.
      * @param crs_address the virtual address of the static module
      * @param link_on_load_bug_fix true if links when loading and fixes the bug
@@ -1971,6 +1982,33 @@ public:
         return GetField(FixedSize);
     }
 
+    bool IsLoaded() const {
+        u32 magic = GetField(Magic);
+        if (magic != MAGIC_CRO0 && magic != MAGIC_FIXD)
+            return false;
+
+        // TODO(wwylele): verify memory state here after memory aliasing is implemented
+
+        return true;
+    }
+
+    /**
+     * Gets the page address and size of the code segment.
+     * @returns a tuple of (address, size); (0, 0) if the code segment doesn't exist.
+     */
+    std::tuple<VAddr, u32> GetExecutablePages() const {
+        u32 segment_num = GetField(SegmentNum);
+        for (u32 i = 0; i < segment_num; ++i) {
+            SegmentEntry entry;
+            GetEntry(i, entry);
+            if (entry.type == SegmentType::Code && entry.size != 0) {
+                VAddr begin = Common::AlignDown(entry.offset, Memory::PAGE_SIZE);
+                VAddr end = Common::AlignUp(entry.offset + entry.size, Memory::PAGE_SIZE);
+                return std::make_tuple(begin, end - begin);
+            }
+        }
+        return std::make_tuple(0, 0);
+    }
 };
 
 std::array<int, 17> CROHelper::ENTRY_SIZE {{
