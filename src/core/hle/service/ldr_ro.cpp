@@ -489,6 +489,532 @@ class CROHelper final {
         return RESULT_SUCCESS;
     }
 
+    /**
+     * Finds an exported named symbol in this module.
+     * @param name the name of the symbol to find
+     * @return VAddr the virtual address of the symbol; 0 if not found.
+     */
+    VAddr FindExportNamedSymbol(const std::string& name) const {
+        if (!GetField(ExportTreeNum))
+            return 0;
+
+        std::size_t len = name.size();
+        ExportTreeEntry entry;
+        GetEntry(0, entry);
+        ExportTreeEntry::Child next;
+        next.raw = entry.left.raw;
+        u32 found_id;
+
+        while (true) {
+            GetEntry(next.next_index, entry);
+
+            if (next.is_end) {
+                found_id = entry.export_table_index;
+                break;
+            }
+
+            u16 test_byte = entry.test_bit >> 3;
+            u16 test_bit_in_byte = entry.test_bit & 7;
+
+            if (test_byte >= len) {
+                next.raw = entry.left.raw;
+            } else if((name[test_byte] >> test_bit_in_byte) & 1) {
+                next.raw = entry.right.raw;
+            } else {
+                next.raw = entry.left.raw;
+            }
+        }
+
+        u32 export_named_symbol_num = GetField(ExportNamedSymbolNum);
+
+        if (found_id >= export_named_symbol_num)
+            return 0;
+
+        u32 export_strings_size = GetField(ExportStringsSize);
+        ExportNamedSymbolEntry symbol_entry;
+        GetEntry(found_id, symbol_entry);
+
+        if (Memory::ReadCString(symbol_entry.name_offset, export_strings_size) != name)
+            return 0;
+
+        return SegmentTagToAddress(symbol_entry.symbol_position);
+    }
+
+    /**
+     * Rebases offsets in module header according to module address.
+     * @param cro_size the size of the CRO file
+     * @returns ResultCode RESULT_SUCCESS if all offsets are verified as valid, otherwise error code.
+     */
+    ResultCode RebaseHeader(u32 cro_size) {
+        ResultCode error = CROFormatError(0x11);
+
+        // verifies magic
+        if (GetField(Magic) != MAGIC_CRO0)
+            return error;
+
+        // verifies not registered
+        if (GetField(NextCRO) || GetField(PreviousCRO))
+            return error;
+
+        // This seems to be a hard limit set by the RO module
+        if (GetField(FileSize) > 0x10000000 || GetField(BssSize) > 0x10000000)
+            return error;
+
+        // verifies not fixed
+        if (GetField(FixedSize))
+            return error;
+
+        if (GetField(CodeOffset) < CRO_HEADER_SIZE)
+            return error;
+
+        // verifies that all offsets are in the correct order
+        constexpr std::array<HeaderField, 18> OFFSET_ORDER = {{
+            CodeOffset,
+            ModuleNameOffset,
+            SegmentTableOffset,
+            ExportNamedSymbolTableOffset,
+            ExportTreeTableOffset,
+            ExportIndexedSymbolTableOffset,
+            ExportStringsOffset,
+            ImportModuleTableOffset,
+            ExternalPatchTableOffset,
+            ImportNamedSymbolTableOffset,
+            ImportIndexedSymbolTableOffset,
+            ImportAnonymousSymbolTableOffset,
+            ImportStringsOffset,
+            StaticAnonymousSymbolTableOffset,
+            InternalPatchTableOffset,
+            StaticPatchTableOffset,
+            DataOffset,
+            FileSize
+        }};
+
+        u32 prev_offset = GetField(OFFSET_ORDER[0]);
+        u32 cur_offset;
+        for (std::size_t i = 1; i < OFFSET_ORDER.size(); ++i) {
+            cur_offset = GetField(OFFSET_ORDER[i]);
+            if (cur_offset < prev_offset)
+                return error;
+            prev_offset = cur_offset;
+        }
+
+        // rebases offsets
+        u32 offset = GetField(NameOffset);
+        if (offset)
+            SetField(NameOffset, offset + address);
+
+        for (int field = CodeOffset; field < Fix0Barrier; field += 2) {
+            HeaderField header_field = static_cast<HeaderField>(field);
+            offset = GetField(header_field);
+            if (offset)
+                SetField(header_field, offset + address);
+        }
+
+        // verifies everything is not beyond the buffer
+        u32 file_end = address + cro_size;
+        for (int field = CodeOffset, i = 0; field < Fix0Barrier; field += 2, ++i) {
+            HeaderField offset_field = static_cast<HeaderField>(field);
+            HeaderField size_field = static_cast<HeaderField>(field + 1);
+            if (GetField(offset_field) + GetField(size_field) * ENTRY_SIZE[i] > file_end)
+                return error;
+        }
+
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Verifies a string matching a predicted size (i.e. terminated by 0) if it is not empty
+     * @param address the virtual address of the string
+     * @param size the size of the string, including the terminating 0
+     * @returns ResultCode RESULT_SUCCESS if the size matches, otherwise error code.
+     */
+    static ResultCode VerifyString(VAddr address, u32 size) {
+        if (size) {
+            if (Memory::Read8(address + size - 1) != 0)
+                return CROFormatError(0x0B);
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Rebases offsets in segment table according to module address.
+     * @param cro_size the size of the CRO file
+     * @param data_segment_address the buffer address for .data segment
+     * @param data_segment_size the buffer size for .data segment
+     * @param bss_segment_address the buffer address for .bss segment
+     * @param bss_segment_size the buffer size for .bss segment
+     * @returns ResultVal<u32> with the previous data segment offset before rebasing.
+     */
+    ResultVal<u32> RebaseSegmentTable(u32 cro_size,
+        VAddr data_segment_address, u32 data_segment_size,
+        VAddr bss_segment_address, u32 bss_segment_size) {
+        u32 prev_data_segment = 0;
+        u32 segment_num = GetField(SegmentNum);
+        for (u32 i = 0; i < segment_num; ++i) {
+            SegmentEntry segment;
+            GetEntry(i, segment);
+            if (segment.type == SegmentType::Data) {
+                if (segment.size) {
+                    if (segment.size > data_segment_size)
+                        return ERROR_BUFFER_TOO_SMALL;
+                    prev_data_segment = segment.offset;
+                    segment.offset = data_segment_address;
+                }
+            } else if (segment.type == SegmentType::BSS) {
+                if (segment.size) {
+                    if (segment.size > bss_segment_size)
+                        return ERROR_BUFFER_TOO_SMALL;
+                    segment.offset = bss_segment_address;
+                }
+            } else if (segment.offset) {
+                segment.offset += address;
+                if (segment.offset > address + cro_size)
+                    return CROFormatError(0x19);
+            }
+            SetEntry(i, segment);
+        }
+        return MakeResult<u32>(prev_data_segment);
+    }
+
+    /**
+     * Rebases offsets in exported named symbol table according to module address.
+     * @returns ResultCode RESULT_SUCCESS if all offsets are verified as valid, otherwise error code.
+     */
+    ResultCode RebaseExportNamedSymbolTable() {
+        VAddr export_strings_offset = GetField(ExportStringsOffset);
+        VAddr export_strings_end = export_strings_offset + GetField(ExportStringsSize);
+
+        u32 export_named_symbol_num = GetField(ExportNamedSymbolNum);
+        for (u32 i = 0; i < export_named_symbol_num; ++i) {
+            ExportNamedSymbolEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.name_offset) {
+                entry.name_offset += address;
+                if (entry.name_offset < export_strings_offset
+                    || entry.name_offset >= export_strings_end) {
+                    return CROFormatError(0x11);
+                }
+            }
+
+            SetEntry(i, entry);
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Verifies indeces in export tree table.
+     * @returns ResultCode RESULT_SUCCESS if all indeces are verified as valid, otherwise error code.
+     */
+    ResultCode VerifyExportTreeTable() const {
+        u32 tree_num = GetField(ExportTreeNum);
+        for (u32 i = 0; i < tree_num; ++i) {
+            ExportTreeEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.left.next_index >= tree_num || entry.right.next_index >= tree_num) {
+                return CROFormatError(0x11);
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Rebases offsets in exported module table according to module address.
+     * @returns ResultCode RESULT_SUCCESS if all offsets are verified as valid, otherwise error code.
+     */
+    ResultCode RebaseImportModuleTable() {
+        VAddr import_strings_offset = GetField(ImportStringsOffset);
+        VAddr import_strings_end = import_strings_offset + GetField(ImportStringsSize);
+        VAddr import_indexed_symbol_table_offset = GetField(ImportIndexedSymbolTableOffset);
+        VAddr index_import_table_end = import_indexed_symbol_table_offset + GetField(ImportIndexedSymbolNum) * sizeof(ImportIndexedSymbolEntry);
+        VAddr import_anonymous_symbol_table_offset = GetField(ImportAnonymousSymbolTableOffset);
+        VAddr offset_import_table_end = import_anonymous_symbol_table_offset + GetField(ImportAnonymousSymbolNum) * sizeof(ImportAnonymousSymbolEntry);
+
+        u32 module_num = GetField(ImportModuleNum);
+        for (u32 i = 0; i < module_num; ++i) {
+            ImportModuleEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.name_offset) {
+                entry.name_offset += address;
+                if (entry.name_offset < import_strings_offset
+                    || entry.name_offset >= import_strings_end) {
+                    return CROFormatError(0x18);
+                }
+            }
+
+            if (entry.import_indexed_symbol_table_offset) {
+                entry.import_indexed_symbol_table_offset += address;
+                if (entry.import_indexed_symbol_table_offset < import_indexed_symbol_table_offset
+                    || entry.import_indexed_symbol_table_offset > index_import_table_end) {
+                    return CROFormatError(0x18);
+                }
+            }
+
+            if (entry.import_anonymous_symbol_table_offset) {
+                entry.import_anonymous_symbol_table_offset += address;
+                if (entry.import_anonymous_symbol_table_offset < import_anonymous_symbol_table_offset
+                    || entry.import_anonymous_symbol_table_offset > offset_import_table_end) {
+                    return CROFormatError(0x18);
+                }
+            }
+
+            SetEntry(i, entry);
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Rebases offsets in imported named symbol table according to module address.
+     * @returns ResultCode RESULT_SUCCESS if all offsets are verified as valid, otherwise error code.
+     */
+    ResultCode RebaseImportNamedSymbolTable() {
+        VAddr import_strings_offset = GetField(ImportStringsOffset);
+        VAddr import_strings_end = import_strings_offset + GetField(ImportStringsSize);
+        VAddr external_patch_table_offset = GetField(ExternalPatchTableOffset);
+        VAddr external_patch_table_end = external_patch_table_offset + GetField(ExternalPatchNum) * sizeof(ExternalPatchEntry);
+
+        u32 num = GetField(ImportNamedSymbolNum);
+        for (u32 i = 0; i < num ; ++i) {
+            ImportNamedSymbolEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.name_offset) {
+                entry.name_offset += address;
+                if (entry.name_offset < import_strings_offset
+                    || entry.name_offset >= import_strings_end) {
+                    return CROFormatError(0x1B);
+                }
+            }
+
+            if (entry.patch_batch_offset) {
+                entry.patch_batch_offset += address;
+                if (entry.patch_batch_offset < external_patch_table_offset
+                    || entry.patch_batch_offset > external_patch_table_end) {
+                    return CROFormatError(0x1B);
+                }
+            }
+
+            SetEntry(i, entry);
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Rebases offsets in imported indexed symbol table according to module address.
+     * @returns ResultCode RESULT_SUCCESS if all offsets are verified as valid, otherwise error code.
+     */
+    ResultCode RebaseImportIndexedSymbolTable() {
+        VAddr external_patch_table_offset = GetField(ExternalPatchTableOffset);
+        VAddr external_patch_table_end = external_patch_table_offset + GetField(ExternalPatchNum) * sizeof(ExternalPatchEntry);
+
+        u32 num = GetField(ImportIndexedSymbolNum);
+        for (u32 i = 0; i < num ; ++i) {
+            ImportIndexedSymbolEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.patch_batch_offset) {
+                entry.patch_batch_offset += address;
+                if (entry.patch_batch_offset < external_patch_table_offset
+                    || entry.patch_batch_offset > external_patch_table_end) {
+                    return CROFormatError(0x14);
+                }
+            }
+
+            SetEntry(i, entry);
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Rebases offsets in imported anonymous symbol table according to module address.
+     * @returns ResultCode RESULT_SUCCESS if all offsets are verified as valid, otherwise error code.
+     */
+    ResultCode RebaseImportAnonymousSymbolTable() {
+        VAddr external_patch_table_offset = GetField(ExternalPatchTableOffset);
+        VAddr external_patch_table_end = external_patch_table_offset + GetField(ExternalPatchNum) * sizeof(ExternalPatchEntry);
+
+        u32 num = GetField(ImportAnonymousSymbolNum);
+        for (u32 i = 0; i < num ; ++i) {
+            ImportAnonymousSymbolEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.patch_batch_offset) {
+                entry.patch_batch_offset += address;
+                if (entry.patch_batch_offset < external_patch_table_offset
+                    || entry.patch_batch_offset > external_patch_table_end) {
+                    return CROFormatError(0x17);
+                }
+            }
+
+            SetEntry(i, entry);
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Resets all external patches to unresolved state.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ResetExternalPatches() {
+        u32 unresolved_symbol = SegmentTagToAddress(GetField(OnUnresolvedSegmentTag));
+        u32 external_patch_num = GetField(ExternalPatchNum);
+        ExternalPatchEntry patch;
+
+        // Verifies that the last patch is the end of a batch
+        GetEntry(external_patch_num - 1, patch);
+        if (!patch.is_batch_end) {
+            return CROFormatError(0x12);
+        }
+
+        bool batch_begin = true;
+        for (u32 i = 0; i < external_patch_num; ++i) {
+            GetEntry(i, patch);
+            VAddr patch_target = SegmentTagToAddress(patch.target_position);
+
+            if (patch_target == 0) {
+                return CROFormatError(0x12);
+            }
+
+            ResultCode result = ApplyPatch(patch_target, patch.type, patch.shift, unresolved_symbol, patch_target);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error applying patch %08X", result.raw);
+                return result;
+            }
+
+            if (batch_begin) {
+                // resets to unresolved state
+                patch.is_batch_resolved = 0;
+                SetEntry(i, patch);
+            }
+
+            // if current is an end, then the next is a beginning
+            batch_begin = patch.is_batch_end != 0;
+        }
+
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Applies all static anonymous symbol to the static module.
+     * @param crs_address the virtual address of the static module
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyStaticAnonymousSymbolToCRS(VAddr crs_address) {
+        VAddr static_patch_table_offset = GetField(StaticPatchTableOffset);
+        VAddr static_patch_table_end = static_patch_table_offset + GetField(StaticPatchNum) * sizeof(StaticPatchEntry);
+
+        CROHelper crs(crs_address);
+        u32 offset_export_num = GetField(StaticAnonymousSymbolNum);
+        LOG_INFO(Service_LDR, "CRO \"%s\" exports %d static anonymous symbols", ModuleName().data(), offset_export_num);
+        for (u32 i = 0; i < offset_export_num; ++i) {
+            StaticAnonymousSymbolEntry entry;
+            GetEntry(i, entry);
+            u32 batch_address = entry.patch_batch_offset + address;
+
+            if (batch_address < static_patch_table_offset
+                || batch_address > static_patch_table_end) {
+                return CROFormatError(0x16);
+            }
+
+            u32 symbol_address = SegmentTagToAddress(entry.symbol_position);
+            LOG_TRACE(Service_LDR, "CRO \"%s\" exports 0x%08X to the static module", ModuleName().data(), symbol_address);
+            ResultCode result = crs.ApplyPatchBatch(batch_address, symbol_address);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                return result;
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Applies all internal patches to the module itself.
+     * @param old_data_segment_address the virtual address of data segment in CRO buffer
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyInternalPatches(u32 old_data_segment_address) {
+        u32 segment_num = GetField(SegmentNum);
+        u32 internal_patch_num = GetField(InternalPatchNum);
+        for (u32 i = 0; i < internal_patch_num; ++i) {
+            InternalPatchEntry patch;
+            GetEntry(i, patch);
+            VAddr target_addressB = SegmentTagToAddress(patch.target_position);
+            if (target_addressB == 0) {
+                return CROFormatError(0x15);
+            }
+
+            VAddr target_address;
+            SegmentEntry target_segment;
+            GetEntry(patch.target_position.segment_index, target_segment);
+
+            if (target_segment.type == SegmentType::Data) {
+                // If the patch is to the .data segment, we need to patch it in the old buffer
+                target_address = old_data_segment_address + patch.target_position.offset_into_segment;
+            } else {
+                target_address = target_addressB;
+            }
+
+            if (patch.symbol_segment >= segment_num) {
+                return CROFormatError(0x15);
+            }
+
+            SegmentEntry symbol_segment;
+            GetEntry(patch.symbol_segment, symbol_segment);
+            LOG_TRACE(Service_LDR, "Internally patches 0x%08X with 0x%08X", target_address, symbol_segment.offset);
+            ResultCode result = ApplyPatch(target_address, patch.type, patch.shift, symbol_segment.offset, target_addressB);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error applying patch %08X", result.raw);
+                return result;
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Resolves the exit function in this module
+     * @param crs_address the virtual address of the static module.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyExitPatches(VAddr crs_address) {
+        u32 import_strings_size = GetField(ImportStringsSize);
+        u32 symbol_import_num = GetField(ImportNamedSymbolNum);
+        for (u32 i = 0; i < symbol_import_num; ++i) {
+            ImportNamedSymbolEntry entry;
+            GetEntry(i, entry);
+            VAddr patch_addr = entry.patch_batch_offset;
+            ExternalPatchEntry patch_entry;
+            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+
+            if (Memory::ReadCString(entry.name_offset, import_strings_size) == "__aeabi_atexit"){
+                ResultCode result = ForEachAutoLinkCRO(crs_address, [&](CROHelper source) -> ResultVal<bool> {
+                    u32 symbol_address = source.FindExportNamedSymbol("nnroAeabiAtexit_");
+
+                    if (symbol_address) {
+                        LOG_DEBUG(Service_LDR, "CRO \"%s\" import exit function from \"%s\"",
+                            ModuleName().data(), source.ModuleName().data());
+
+                        ResultCode result = ApplyPatchBatch(patch_addr, symbol_address);
+                        if (result.IsError()) {
+                            LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                            return result;
+                        }
+
+                        return MakeResult<bool>(false);
+                    }
+
+                    return MakeResult<bool>(true);
+                });
+                if (result.IsError()) {
+                    LOG_ERROR(Service_LDR, "Error applying exit patch %08X", result.raw);
+                    return result;
+                }
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
 public:
     explicit CROHelper(VAddr cro_address) : address(cro_address) {
     }
@@ -499,6 +1025,124 @@ public:
 
     u32 GetFileSize() const {
         return GetField(FileSize);
+    }
+
+    /**
+     * Rebases the module according to its address.
+     * @param crs_address the virtual address of the static module
+     * @param cro_size the size of the CRO file
+     * @param data_segment_address buffer address for .data segment
+     * @param data_segment_size the buffer size for .data segment
+     * @param bss_segment_address the buffer address for .bss segment
+     * @param bss_segment_size the buffer size for .bss segment
+     * @param is_crs true if the module itself is the static module
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode Rebase(VAddr crs_address, u32 cro_size,
+        VAddr data_segment_addresss, u32 data_segment_size,
+        VAddr bss_segment_address, u32 bss_segment_size, bool is_crs) {
+        ResultCode result = RebaseHeader(cro_size);
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error rebasing header %08X", result.raw);
+            return result;
+        }
+
+        result = VerifyString(GetField(ModuleNameOffset), GetField(ModuleNameSize));
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error verifying module name %08X", result.raw);
+            return result;
+        }
+
+        u32 prev_data_segment_address = 0;
+        if (!is_crs) {
+            auto result_val = RebaseSegmentTable(cro_size,
+                data_segment_addresss, data_segment_size,
+                bss_segment_address, bss_segment_size);
+            if (result_val.Failed()) {
+                LOG_ERROR(Service_LDR, "Error rebasing segment table %08X", result_val.Code().raw);
+                return result_val.Code();
+            }
+            prev_data_segment_address = *result_val;
+        }
+        prev_data_segment_address += address;
+
+        result = RebaseExportNamedSymbolTable();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error rebasing symbol export table %08X", result.raw);
+            return result;
+        }
+
+        result = VerifyExportTreeTable();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error verifying export tree %08X", result.raw);
+            return result;
+        }
+
+        result = VerifyString(GetField(ExportStringsOffset), GetField(ExportStringsSize));
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error verifying export strings %08X", result.raw);
+            return result;
+        }
+
+        result = RebaseImportModuleTable();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error rebasing object table %08X", result.raw);
+            return result;
+        }
+
+        result = ResetExternalPatches();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error resetting all external patches %08X", result.raw);
+            return result;
+        }
+
+        result = RebaseImportNamedSymbolTable();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error rebasing symbol import table %08X", result.raw);
+            return result;
+        }
+
+        result = RebaseImportIndexedSymbolTable();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error rebasing index import table %08X", result.raw);
+            return result;
+        }
+
+        result = RebaseImportAnonymousSymbolTable();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error rebasing offset import table %08X", result.raw);
+            return result;
+        }
+
+        result = VerifyString(GetField(ImportStringsOffset), GetField(ImportStringsSize));
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error verifying import strings %08X", result.raw);
+            return result;
+        }
+
+        if (!is_crs) {
+            result = ApplyStaticAnonymousSymbolToCRS(crs_address);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error applying offset export to CRS %08X", result.raw);
+                return result;
+            }
+        }
+
+        result = ApplyInternalPatches(prev_data_segment_address);
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error applying internal patches %08X", result.raw);
+            return result;
+        }
+
+        if (!is_crs) {
+            result = ApplyExitPatches(crs_address);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error applying exit patches %08X", result.raw);
+                return result;
+            }
+        }
+
+        return RESULT_SUCCESS;
     }
 
     void InitCRS() {
