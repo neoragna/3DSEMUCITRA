@@ -387,6 +387,108 @@ class CROHelper final {
         return RESULT_SUCCESS;
     }
 
+    /**
+     * Applies a patch
+     * @param target_address where to apply the patch
+     * @param patch_type the type of the patch
+     * @param shift address shift apply to the patched symbol
+     * @param symbol_address the symbol address to be patched with
+     * @param target_future_address the future address of the target.
+     *        Usually equals to target_address, but will be different for a target in .data segment
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyPatch(VAddr target_address, PatchType patch_type, u32 shift, u32 symbol_address, u32 target_future_address) {
+        switch (patch_type) {
+        case PatchType::Nothing:
+            break;
+        case PatchType::AbsoluteAddress:
+        case PatchType::AbsoluteAddress2:
+            Memory::Write32(target_address, symbol_address + shift);
+            break;
+        case PatchType::RelativeAddress:
+            Memory::Write32(target_address, symbol_address + shift - target_future_address);
+            break;
+        case PatchType::ThumbBranch:
+        case PatchType::ArmBranch:
+        case PatchType::ModifyArmBranch:
+        case PatchType::AlignedRelativeAddress:
+            // TODO(wwylele): implement other types
+            UNIMPLEMENTED();
+            break;
+        default:
+            return CROFormatError(0x22);
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Clears a patch to zero
+     * @param target_address where to apply the patch
+     * @param patch_type the type of the patch
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ClearPatch(VAddr target_address, PatchType patch_type) {
+        switch (patch_type) {
+        case PatchType::Nothing:
+            break;
+        case PatchType::AbsoluteAddress:
+        case PatchType::AbsoluteAddress2:
+        case PatchType::RelativeAddress:
+            Memory::Write32(target_address, 0);
+            break;
+        case PatchType::ThumbBranch:
+        case PatchType::ArmBranch:
+        case PatchType::ModifyArmBranch:
+        case PatchType::AlignedRelativeAddress:
+            // TODO(wwylele): implement other types
+            UNIMPLEMENTED();
+            break;
+        default:
+            return CROFormatError(0x22);
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Applies or resets a batch of patch
+     * @param batch the virtual address of the first patch in the batch
+     * @param symbol_address the symbol address to be patched with
+     * @param reset false to set the batch to resolved state, true to reset the batch to unresolved state
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyPatchBatch(VAddr batch, u32 symbol_address, bool reset = false) {
+        if (symbol_address == 0 && !reset)
+            return CROFormatError(0x10);
+
+        VAddr patch_address = batch;
+        while (true) {
+            PatchEntry patch;
+            Memory::ReadBlock(patch_address, &patch, sizeof(PatchEntry));
+
+            VAddr patch_target = SegmentTagToAddress(patch.target_position);
+            if (patch_target == 0) {
+                return CROFormatError(0x12);
+            }
+
+            ResultCode result = ApplyPatch(patch_target, patch.type, patch.shift, symbol_address, patch_target);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error applying patch %08X", result.raw);
+                return result;
+            }
+
+            if (patch.is_batch_end)
+                break;
+
+            patch_address += sizeof(PatchEntry);
+        }
+
+        PatchEntry patch;
+        Memory::ReadBlock(batch, &patch, sizeof(PatchEntry));
+        patch.is_batch_resolved = reset ? 0 : 1;
+        Memory::WriteBlock(batch, &patch, sizeof(PatchEntry));
+        return RESULT_SUCCESS;
+    }
+
 public:
     explicit CROHelper(VAddr cro_address) : address(cro_address) {
     }
