@@ -2038,6 +2038,51 @@ std::array<CROHelper::HeaderField, 4> CROHelper::FIX_BARRIERS {{
     Fix3Barrier
 }};
 
+// This is a work-around before we implement memory aliasing.
+// CRS and CRO are mapped (aliased) to another memory when loading.
+// Games can read from both the original buffer or the mapped memory,
+// and even write to the original buffer after CRO loading.
+// So we use this to synchronize all original buffer with mapped memory
+// after modifiying the content (rebasing, linking, etc.).
+class MemorySynchronizer {
+    std::map<VAddr, std::tuple<VAddr, u32>> memory_blocks;
+
+public:
+    void Clear() {
+        memory_blocks.clear();
+    }
+
+    void AddMemoryBlock(VAddr mapping, VAddr original, u32 size) {
+        memory_blocks[mapping] = std::make_tuple(original, size);
+    }
+
+    void RemoveMemoryBlock(VAddr source) {
+        memory_blocks.erase(source);
+    }
+
+    void SynchronizeOriginalMemory() {
+        for (auto block : memory_blocks) {
+            VAddr mapping = block.first;
+            VAddr original;
+            u32 size;
+            std::tie(original, size) = block.second;
+            Memory::CopyBlock(original, mapping, size);
+        }
+    }
+
+    void SynchronizeMappingMemory() {
+        for (auto block : memory_blocks) {
+            VAddr mapping = block.first;
+            VAddr original;
+            u32 size;
+            std::tie(original, size) = block.second;
+            Memory::CopyBlock(mapping, original, size);
+        }
+    }
+};
+
+static MemorySynchronizer memory_synchronizer;
+
 /**
  * LDR_RO::Initialize service function
  *  Inputs:
