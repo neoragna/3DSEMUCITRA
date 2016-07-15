@@ -1151,6 +1151,187 @@ class CROHelper final {
     }
 
     /**
+     * Looks up all imported named symbols of this module in all registered auto-link modules, and resolves them if found.
+     * @param crs_address the virtual address of the static module
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyImportNamedSymbol(VAddr crs_address) {
+        u32 import_strings_size = GetField(ImportStringsSize);
+        u32 symbol_import_num = GetField(ImportNamedSymbolNum);
+        for (u32 i = 0; i < symbol_import_num; ++i) {
+            ImportNamedSymbolEntry entry;
+            GetEntry(i, entry);
+            VAddr patch_addr = entry.patch_batch_offset;
+            ExternalPatchEntry patch_entry;
+            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+
+            if (!patch_entry.is_batch_resolved) {
+                ResultCode result = ForEachAutoLinkCRO(crs_address, [&](CROHelper source) -> ResultVal<bool> {
+                    std::string symbol_name = Memory::ReadCString(entry.name_offset, import_strings_size);
+                    u32 symbol_address = source.FindExportNamedSymbol(symbol_name);
+
+                    if (symbol_address) {
+                        LOG_TRACE(Service_LDR, "CRO \"%s\" imports \"%s\" from \"%s\"",
+                            ModuleName().data(), symbol_name.data(), source.ModuleName().data());
+
+                        ResultCode result = ApplyPatchBatch(patch_addr, symbol_address);
+                        if (result.IsError()) {
+                            LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                            return result;
+                        }
+
+                        return MakeResult<bool>(false);
+                    }
+
+                    return MakeResult<bool>(true);
+                });
+                if (result.IsError()) {
+                    return result;
+                }
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Finds registered auto-link modules that this module imports, and resolves indexed and anonymous symbols exported by them.
+     * @param crs_address the virtual address of the static module
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyModuleImport(VAddr crs_address) {
+        u32 import_strings_size = GetField(ImportStringsSize);
+
+        u32 import_module_num = GetField(ImportModuleNum);
+        for (u32 i = 0; i < import_module_num; ++i) {
+            ImportModuleEntry entry;
+            GetEntry(i, entry);
+            std::string want_cro_name = Memory::ReadCString(entry.name_offset, import_strings_size);
+
+            ResultCode result = ForEachAutoLinkCRO(crs_address, [&](CROHelper source) -> ResultVal<bool> {
+                if (want_cro_name == source.ModuleName()) {
+                    LOG_INFO(Service_LDR, "CRO \"%s\" imports %d indexed symbols from \"%s\"",
+                        ModuleName().data(), entry.import_indexed_symbol_num, source.ModuleName().data());
+                    for (u32 j = 0; j < entry.import_indexed_symbol_num; ++j) {
+                        ImportIndexedSymbolEntry im;
+                        entry.GetImportIndexedSymbolEntry(j, im);
+                        ExportIndexedSymbolEntry ex;
+                        source.GetEntry(im.index, ex);
+                        u32 symbol_address = source.SegmentTagToAddress(ex.symbol_position);
+                        LOG_TRACE(Service_LDR, "    Imports 0x%08X", symbol_address);
+                        ResultCode result = ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                        if (result.IsError()) {
+                            LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                            return result;
+                        }
+                    }
+                    LOG_INFO(Service_LDR, "CRO \"%s\" imports %d anonymous symbols from \"%s\"",
+                        ModuleName().data(), entry.import_anonymous_symbol_num, source.ModuleName().data());
+                    for (u32 j = 0; j < entry.import_anonymous_symbol_num; ++j) {
+                        ImportAnonymousSymbolEntry im;
+                        entry.GetImportAnonymousSymbolEntry(j, im);
+                        u32 symbol_address = source.SegmentTagToAddress(im.symbol_position);
+                        LOG_TRACE(Service_LDR, "    Imports 0x%08X", symbol_address);
+                        ResultCode result = ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                        if (result.IsError()) {
+                            LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                            return result;
+                        }
+                    }
+                    return MakeResult<bool>(false);
+                }
+                return MakeResult<bool>(true);
+            });
+            if (result.IsError()) {
+                return result;
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Resolves target module's imported named symbols that exported by this module.
+     * @param target the module to resolve.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyExportNamedSymbol(CROHelper target) {
+        LOG_DEBUG(Service_LDR, "CRO \"%s\" exports named symbols to \"%s\"",
+            ModuleName().data(), target.ModuleName().data());
+        u32 target_import_strings_size = target.GetField(ImportStringsSize);
+        u32 target_symbol_import_num = target.GetField(ImportNamedSymbolNum);
+        for (u32 i = 0; i < target_symbol_import_num; ++i) {
+            ImportNamedSymbolEntry entry;
+            target.GetEntry(i, entry);
+            VAddr patch_addr = entry.patch_batch_offset;
+            ExternalPatchEntry patch_entry;
+            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+
+            if (!patch_entry.is_batch_resolved) {
+                std::string symbol_name = Memory::ReadCString(entry.name_offset, target_import_strings_size);
+                u32 symbol_address = FindExportNamedSymbol(symbol_name);
+                if (symbol_address) {
+                    LOG_TRACE(Service_LDR, "    exports symbol \"%s\"", symbol_name.data());
+                    ResultCode result = target.ApplyPatchBatch(patch_addr, symbol_address);
+                    if (result.IsError()) {
+                        LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                        return result;
+                    }
+                }
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Resolves imported indexed and anonymous symbols in the target module which imports this module.
+     * @param target the module to resolve.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ApplyModuleExport(CROHelper target) {
+        std::string module_name = ModuleName();
+        u32 target_import_string_size = target.GetField(ImportStringsSize);
+        u32 target_import_module_num = target.GetField(ImportModuleNum);
+        for (u32 i = 0; i < target_import_module_num; ++i) {
+            ImportModuleEntry entry;
+            target.GetEntry(i, entry);
+
+            if (Memory::ReadCString(entry.name_offset, target_import_string_size) != module_name)
+                continue;
+
+            LOG_INFO(Service_LDR, "CRO \"%s\" exports %d indexed symbols to \"%s\"",
+                module_name.data(), entry.import_indexed_symbol_num, target.ModuleName().data());
+            for (u32 j = 0; j < entry.import_indexed_symbol_num; ++j) {
+                ImportIndexedSymbolEntry im;
+                entry.GetImportIndexedSymbolEntry(j, im);
+                ExportIndexedSymbolEntry ex;
+                GetEntry(im.index, ex);
+                u32 symbol_address = SegmentTagToAddress(ex.symbol_position);
+                LOG_TRACE(Service_LDR, "    exports symbol 0x%08X", symbol_address);
+                ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                if (result.IsError()) {
+                    LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                    return result;
+                }
+            }
+
+            LOG_INFO(Service_LDR, "CRO \"%s\" exports %d anonymous symbols to \"%s\"",
+                module_name.data(), entry.import_anonymous_symbol_num, target.ModuleName().data());
+            for (u32 j = 0; j < entry.import_anonymous_symbol_num; ++j) {
+                ImportAnonymousSymbolEntry im;
+                entry.GetImportAnonymousSymbolEntry(j, im);
+                u32 symbol_address = SegmentTagToAddress(im.symbol_position);
+                LOG_TRACE(Service_LDR, "    exports symbol 0x%08X", symbol_address);
+                ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                if (result.IsError()) {
+                    LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                    return result;
+                }
+            }
+        }
+
+        return RESULT_SUCCESS;
+    }
+
+    /**
      * Resolves the exit function in this module
      * @param crs_address the virtual address of the static module.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
@@ -1343,6 +1524,85 @@ public:
         SetField(FixedSize, 0);
 
         UnrebaseHeader();
+    }
+
+    /**
+     * Links this module with all registered auto-link module.
+     * @param crs_address the virtual address of the static module
+     * @param link_on_load_bug_fix true if links when loading and fixes the bug
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode Link(VAddr crs_address, bool link_on_load_bug_fix) {
+        ResultCode result = RESULT_SUCCESS;
+
+        {
+            VAddr data_segment_address;
+            if (link_on_load_bug_fix) {
+                // this is a bug fix introduced by 7.2.0-17's LoadCRO_New
+                // The bug itself is:
+                // If a patch target is in .data segment, it will patch to the
+                // user-specified buffer. But if this is linking during loading,
+                // the .data segment hasn't been tranfer from CRO to the buffer,
+                // thus the patch will be overwritten by data transfer.
+                // To fix this bug, we need temporarily restore the old .data segment
+                // offset and apply imported symbols.
+
+                // RO service seems assuming segment_index == segment_type,
+                // so we do the same
+                if (GetField(SegmentNum) >= 2) { // means we have .data segment
+                    SegmentEntry entry;
+                    GetEntry(2, entry);
+                    ASSERT(entry.type == SegmentType::Data);
+                    data_segment_address = entry.offset;
+                    entry.offset = GetField(DataOffset);
+                    SetEntry(2, entry);
+                }
+            }
+            SCOPE_EXIT({
+                // Restore the new .data segment address after importing
+                if (link_on_load_bug_fix) {
+                    if (GetField(SegmentNum) >= 2) {
+                        SegmentEntry entry;
+                        GetEntry(2, entry);
+                        entry.offset = data_segment_address;
+                        SetEntry(2, entry);
+                    }
+                }
+            });
+
+            // Imports named symbols from other modules
+            result = ApplyImportNamedSymbol(crs_address);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error applying symbol import %08X", result.raw);
+                return result;
+            }
+
+            // Imports indexed and anonymous symbols from other modules
+            result = ApplyModuleImport(crs_address);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error applying module import %08X", result.raw);
+                return result;
+            }
+        }
+
+        // Exports symbols to other modules
+        result = ForEachAutoLinkCRO(crs_address, [this](CROHelper target) -> ResultVal<bool> {
+            ResultCode result = ApplyExportNamedSymbol(target);
+            if (result.IsError())
+                return result;
+
+            result = ApplyModuleExport(target);
+            if (result.IsError())
+                return result;
+
+            return MakeResult<bool>(true);
+        });
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error applying export %08X", result.raw);
+            return result;
+        }
+
+        return RESULT_SUCCESS;
     }
 
     /**
