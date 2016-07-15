@@ -897,6 +897,42 @@ class CROHelper final {
     }
 
     /**
+     * Clears all external patches to zero.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ClearExternalPatches() {
+        u32 external_patch_num = GetField(ExternalPatchNum);
+        ExternalPatchEntry patch;
+
+        bool batch_begin = true;
+        for (u32 i = 0; i < external_patch_num; ++i) {
+            GetEntry(i, patch);
+            VAddr patch_target = SegmentTagToAddress(patch.target_position);
+
+            if (patch_target == 0) {
+                return CROFormatError(0x12);
+            }
+
+            ResultCode result = ClearPatch(patch_target, patch.type);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error clearing patch %08X", result.raw);
+                return result;
+            }
+
+            if (batch_begin) {
+                // resets to unresolved state
+                patch.is_batch_resolved = 0;
+                SetEntry(i, patch);
+            }
+
+            // if current is an end, then the next is a beginning
+            batch_begin = patch.is_batch_end != 0;
+        }
+
+        return RESULT_SUCCESS;
+    }
+
+    /**
      * Applies all static anonymous symbol to the static module.
      * @param crs_address the virtual address of the static module
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
@@ -1307,6 +1343,25 @@ public:
         SetField(FixedSize, 0);
 
         UnrebaseHeader();
+    }
+
+    /**
+     * Clears all patches to zero.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ClearPatches() {
+        ResultCode result = ClearExternalPatches();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error clearing external patches %08X", result.raw);
+            return result;
+        }
+
+        result = ClearInternalPatches();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error clearing internal patches %08X", result.raw);
+            return result;
+        }
+        return RESULT_SUCCESS;
     }
 
     void InitCRS() {
