@@ -1194,6 +1194,79 @@ class CROHelper final {
     }
 
     /**
+     * Resets all imported named symbols of this module to unresolved state.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ResetImportNamedSymbol() {
+        u32 unresolved_symbol = SegmentTagToAddress(GetField(OnUnresolvedSegmentTag));
+
+        u32 symbol_import_num = GetField(ImportNamedSymbolNum);
+        for (u32 i = 0; i < symbol_import_num; ++i) {
+            ImportNamedSymbolEntry entry;
+            GetEntry(i, entry);
+            VAddr patch_addr = entry.patch_batch_offset;
+            ExternalPatchEntry patch_entry;
+            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+
+            ResultCode result = ApplyPatchBatch(patch_addr, unresolved_symbol, true);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error reseting patch batch %08X", result.raw);
+                return result;
+            }
+
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Resets all imported indexed symbols of this module to unresolved state.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ResetImportIndexedSymbol() {
+        u32 unresolved_symbol = SegmentTagToAddress(GetField(OnUnresolvedSegmentTag));
+
+        u32 import_num = GetField(ImportIndexedSymbolNum);
+        for (u32 i = 0; i < import_num; ++i) {
+            ImportIndexedSymbolEntry entry;
+            GetEntry(i, entry);
+            VAddr patch_addr = entry.patch_batch_offset;
+            ExternalPatchEntry patch_entry;
+            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+
+            ResultCode result = ApplyPatchBatch(patch_addr, unresolved_symbol, true);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error reseting patch batch %08X", result.raw);
+                return result;
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Resets all imported anonymous symbols of this module to unresolved state.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ResetImportAnonymousSymbol() {
+        u32 unresolved_symbol = SegmentTagToAddress(GetField(OnUnresolvedSegmentTag));
+
+        u32 import_num = GetField(ImportAnonymousSymbolNum);
+        for (u32 i = 0; i < import_num; ++i) {
+            ImportAnonymousSymbolEntry entry;
+            GetEntry(i, entry);
+            VAddr patch_addr = entry.patch_batch_offset;
+            ExternalPatchEntry patch_entry;
+            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+
+            ResultCode result = ApplyPatchBatch(patch_addr, unresolved_symbol, true);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error reseting patch batch %08X", result.raw);
+                return result;
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
      * Finds registered auto-link modules that this module imports, and resolves indexed and anonymous symbols exported by them.
      * @param crs_address the virtual address of the static module
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
@@ -1282,6 +1355,40 @@ class CROHelper final {
     }
 
     /**
+     * Resets target's named symbols imported from this module to unresolved state.
+     * @param target the module to reset.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ResetExportNamedSymbol(CROHelper target) {
+        LOG_DEBUG(Service_LDR, "CRO \"%s\" unexports named symbols to \"%s\"",
+            ModuleName().data(), target.ModuleName().data());
+        u32 unresolved_symbol = target.SegmentTagToAddress(target.GetField(OnUnresolvedSegmentTag));
+        u32 target_import_strings_size = target.GetField(ImportStringsSize);
+        u32 target_symbol_import_num = target.GetField(ImportNamedSymbolNum);
+        for (u32 i = 0; i < target_symbol_import_num; ++i) {
+            ImportNamedSymbolEntry entry;
+            target.GetEntry(i, entry);
+            VAddr patch_addr = entry.patch_batch_offset;
+            ExternalPatchEntry patch_entry;
+            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+
+            if (patch_entry.is_batch_resolved) {
+                std::string symbol_name = Memory::ReadCString(entry.name_offset, target_import_strings_size);
+                u32 symbol_address = FindExportNamedSymbol(symbol_name);
+                if (symbol_address) {
+                    LOG_TRACE(Service_LDR, "    unexports symbol \"%s\"", symbol_name.data());
+                    ResultCode result = target.ApplyPatchBatch(patch_addr, unresolved_symbol, true);
+                    if (result.IsError()) {
+                        LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                        return result;
+                    }
+                }
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /**
      * Resolves imported indexed and anonymous symbols in the target module which imports this module.
      * @param target the module to resolve.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
@@ -1321,6 +1428,52 @@ class CROHelper final {
                 u32 symbol_address = SegmentTagToAddress(im.symbol_position);
                 LOG_TRACE(Service_LDR, "    exports symbol 0x%08X", symbol_address);
                 ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                if (result.IsError()) {
+                    LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                    return result;
+                }
+            }
+        }
+
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Resets target's indexed and anonymous symbol imported from this module to unresolved state.
+     * @param target the module to reset.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ResetModuleExport(CROHelper target) {
+        u32 unresolved_symbol = target.SegmentTagToAddress(target.GetField(OnUnresolvedSegmentTag));
+
+        std::string module_name = ModuleName();
+        u32 target_import_string_size = target.GetField(ImportStringsSize);
+        u32 target_import_module_num = target.GetField(ImportModuleNum);
+        for (u32 i = 0; i < target_import_module_num; ++i) {
+            ImportModuleEntry entry;
+            target.GetEntry(i, entry);
+
+            if (Memory::ReadCString(entry.name_offset, target_import_string_size) != module_name)
+                continue;
+
+            LOG_DEBUG(Service_LDR, "CRO \"%s\" unexports indexed symbols to \"%s\"",
+                module_name.data(), target.ModuleName().data());
+            for (u32 j = 0; j < entry.import_indexed_symbol_num; ++j) {
+                ImportIndexedSymbolEntry im;
+                entry.GetImportIndexedSymbolEntry(j, im);
+                ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, unresolved_symbol, true);
+                if (result.IsError()) {
+                    LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                    return result;
+                }
+            }
+
+            LOG_DEBUG(Service_LDR, "CRO \"%s\" unexports anonymous symbols to \"%s\"",
+                module_name.data(), target.ModuleName().data());
+            for (u32 j = 0; j < entry.import_anonymous_symbol_num; ++j) {
+                ImportAnonymousSymbolEntry im;
+                entry.GetImportAnonymousSymbolEntry(j, im);
+                ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, unresolved_symbol, true);
                 if (result.IsError()) {
                     LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
                     return result;
@@ -1599,6 +1752,55 @@ public:
         });
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error applying export %08X", result.raw);
+            return result;
+        }
+
+        return RESULT_SUCCESS;
+    }
+
+    /**
+     * Unlinks this module with other modules.
+     * @param crs_address the virtual address of the static module
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode Unlink(VAddr crs_address) {
+
+        // Resets all imported named symbols
+        ResultCode result = ResetImportNamedSymbol();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error resetting symbol import %08X", result.raw);
+            return result;
+        }
+
+        // Resets all imported indexed symbols
+        result = ResetImportIndexedSymbol();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error resetting indexed import %08X", result.raw);
+            return result;
+        }
+
+        // Resets all imported anonymous symbols
+        result = ResetImportAnonymousSymbol();
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error resetting anonymous import %08X", result.raw);
+            return result;
+        }
+
+        // Resets all symbols in other modules imported from this module
+        // Note: the RO service seems only searching in auto-link modules
+        result = ForEachAutoLinkCRO(crs_address, [this](CROHelper target) -> ResultVal<bool> {
+            ResultCode result = ResetExportNamedSymbol(target);
+            if (result.IsError())
+                return result;
+
+            result = ResetModuleExport(target);
+            if (result.IsError())
+                return result;
+
+            return MakeResult<bool>(true);
+        });
+        if (result.IsError()) {
+            LOG_ERROR(Service_LDR, "Error resetting export %08X", result.raw);
             return result;
         }
 
