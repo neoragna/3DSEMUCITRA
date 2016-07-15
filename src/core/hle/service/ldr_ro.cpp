@@ -1915,6 +1915,62 @@ public:
         SetPrevious(0);
     }
 
+    /**
+     * Gets the end of reserved data according to the fix level.
+     * @param fix_level fix level from 0 to 3
+     * @returns the end of reserved data.
+     */
+    u32 GetFixEnd(u32 fix_level) const {
+        u32 end = CRO_HEADER_SIZE;
+        end = std::max<u32>(end, GetField(CodeOffset) + GetField(CodeSize));
+
+        u32 entry_size_i = 2;
+        int field = ModuleNameOffset;
+        while (true) {
+            end = std::max<u32>(end,
+                GetField(static_cast<HeaderField>(field)) +
+                GetField(static_cast<HeaderField>(field + 1)) * ENTRY_SIZE[entry_size_i]);
+
+            ++entry_size_i;
+            field += 2;
+
+            if (field == FIX_BARRIERS[fix_level])
+                return end;
+        }
+    }
+
+    /**
+     * Zeros offsets to cropped data according to the fix level and marks as fixed.
+     * @param fix_level fix level from 0 to 3
+     * @returns page-aligned size of the module after fixing.
+     */
+    u32 Fix(u32 fix_level) {
+        u32 fix_end = GetFixEnd(fix_level);
+
+        if (fix_level != 0) {
+            SetField(Magic, MAGIC_FIXD);
+
+            for (int field = FIX_BARRIERS[fix_level]; field < Fix0Barrier; field += 2) {
+                SetField(static_cast<HeaderField>(field), fix_end);
+                SetField(static_cast<HeaderField>(field + 1), 0);
+            }
+        }
+
+        fix_end = Common::AlignUp(fix_end, Memory::PAGE_SIZE);
+
+        u32 fixed_size = fix_end - address;
+        SetField(FixedSize, fixed_size);
+        return fixed_size;
+    }
+
+    bool IsFixed() const {
+        return GetField(Magic) == MAGIC_FIXD;
+    }
+
+    u32 GetFixedSize() const {
+        return GetField(FixedSize);
+    }
+
 };
 
 std::array<int, 17> CROHelper::ENTRY_SIZE {{
