@@ -349,6 +349,44 @@ class CROHelper final {
         return entry.offset + segment_tag.offset_into_segment;
     }
 
+    VAddr Next() const {
+        return GetField(NextCRO);
+    }
+
+    VAddr Previous() const {
+        return GetField(PreviousCRO);
+    }
+
+    void SetNext(VAddr next) {
+        SetField(NextCRO, next);
+    }
+
+    void SetPrevious(VAddr previous) {
+        SetField(PreviousCRO, previous);
+    }
+
+    /**
+     * A helper function iterating over all registered auto-link modules, including the static module.
+     * @param crs_address the virtual address of the static module
+     * @param func a function object to operate on a module. It accepts one parameter
+     *        CROHelper and returns ResultVal<bool>. It should return true to continue the iteration,
+     *        false to stop the iteration, or an error code (which will also stop the iteration).
+     * @returns ResultCode indicating the result of the operation, RESULT_SUCCESS if all iteration success,
+     *         otherwise error code of the last iteration.
+     */
+    template <typename FunctionObject>
+    static ResultCode ForEachAutoLinkCRO(VAddr crs_address, FunctionObject func) {
+        VAddr current = crs_address;
+        while (current) {
+            CROHelper cro(current);
+            CASCADE_RESULT(bool next, func(cro));
+            if (!next)
+                break;
+            current = cro.Next();
+        }
+        return RESULT_SUCCESS;
+    }
+
 public:
     explicit CROHelper(VAddr cro_address) : address(cro_address) {
     }
@@ -359,6 +397,95 @@ public:
 
     u32 GetFileSize() const {
         return GetField(FileSize);
+    }
+
+    void InitCRS() {
+        SetNext(0);
+        SetPrevious(0);
+    }
+
+    /**
+     * Registers this module and adds it to the module list.
+     * @param crs_address the virtual address of the static module
+     * @auto_link whether to register as an auto link module
+     */
+    void Register(VAddr crs_address, bool auto_link) {
+        CROHelper crs(crs_address);
+        CROHelper head(auto_link ? crs.Next() : crs.Previous());
+
+        if (head.address) {
+            // there are already CROs registered
+            // register as the new tail
+            CROHelper tail(head.Previous());
+
+            // link with the old tail
+            ASSERT(tail.Next() == 0);
+            SetPrevious(tail.address);
+            tail.SetNext(address);
+
+            // set previous of the head pointing to the new tail
+            head.SetPrevious(address);
+        } else {
+            // register as the first CRO
+            // set previous to self as tail
+            SetPrevious(address);
+
+            // set self as head
+            if (auto_link)
+                crs.SetNext(address);
+            else
+                crs.SetPrevious(address);
+        }
+
+        // the new one is the tail
+        SetNext(0);
+    }
+
+    /**
+     * Unregisters this module and removes from the module list.
+     * @param crs_address the virtual address of the static module
+     */
+    void Unregister(VAddr crs_address) {
+        CROHelper crs(crs_address);
+        CROHelper next_head(crs.Next()), previous_head(crs.Previous());
+        CROHelper next(Next()), previous(Previous());
+
+        if (address == next_head.address || address == previous_head.address) {
+            // removing head
+            if (next.address) {
+                // the next is new head
+                // let its previous point to the tail
+                next.SetPrevious(previous.address);
+            }
+
+            // set new head
+            if (address == previous_head.address) {
+                crs.SetPrevious(next.address);
+            } else {
+                crs.SetNext(next.address);
+            }
+        } else if (next.address) {
+            // link previous and next
+            previous.SetNext(next.address);
+            next.SetPrevious(previous.address);
+        } else {
+            // removing tail
+            // set previous as new tail
+            previous.SetNext(0);
+
+            // let head's previous point to the new tail
+            if (next_head.address && next_head.Previous() == address) {
+                next_head.SetPrevious(previous.address);
+            } else if (previous_head.address && previous_head.Previous() == address) {
+                previous_head.SetPrevious(previous.address);
+            } else {
+                UNREACHABLE();
+            }
+        }
+
+        // unlink self
+        SetNext(0);
+        SetPrevious(0);
     }
 
 };
