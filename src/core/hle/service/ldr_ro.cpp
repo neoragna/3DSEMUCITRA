@@ -973,6 +973,148 @@ class CROHelper final {
     }
 
     /**
+     * Clears all internal patches to zero.
+     * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
+     */
+    ResultCode ClearInternalPatches() {
+        u32 internal_patch_num = GetField(InternalPatchNum);
+        for (u32 i = 0; i < internal_patch_num; ++i) {
+            InternalPatchEntry patch;
+            GetEntry(i, patch);
+            VAddr target_address = SegmentTagToAddress(patch.target_position);
+
+            if (target_address == 0) {
+                return CROFormatError(0x15);
+            }
+
+            ResultCode result = ClearPatch(target_address, patch.type);
+            if (result.IsError()) {
+                LOG_ERROR(Service_LDR, "Error clearing patch %08X", result.raw);
+                return result;
+            }
+        }
+        return RESULT_SUCCESS;
+    }
+
+    /// Unrebases offsets in imported anonymous symbol table
+    void UnrebaseImportAnonymousSymbolTable() {
+        u32 num = GetField(ImportAnonymousSymbolNum);
+        for (u32 i = 0; i < num; ++i) {
+            ImportAnonymousSymbolEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.patch_batch_offset) {
+                entry.patch_batch_offset -= address;
+            }
+
+            SetEntry(i, entry);
+        }
+    }
+
+    /// Unrebases offsets in imported indexed symbol table
+    void UnrebaseImportIndexedSymbolTable() {
+        u32 num = GetField(ImportIndexedSymbolNum);
+        for (u32 i = 0; i < num; ++i) {
+            ImportIndexedSymbolEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.patch_batch_offset) {
+                entry.patch_batch_offset -= address;
+            }
+
+            SetEntry(i, entry);
+        }
+    }
+
+    /// Unrebases offsets in imported named symbol table
+    void UnrebaseImportNamedSymbolTable() {
+        u32 num = GetField(ImportNamedSymbolNum);
+        for (u32 i = 0; i < num; ++i) {
+            ImportNamedSymbolEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.name_offset) {
+                entry.name_offset -= address;
+            }
+
+            if (entry.patch_batch_offset) {
+                entry.patch_batch_offset -= address;
+            }
+
+            SetEntry(i, entry);
+        }
+    }
+
+    /// Unrebases offsets in imported module table
+    void UnrebaseImportModuleTable() {
+        u32 module_num = GetField(ImportModuleNum);
+        for (u32 i = 0; i < module_num; ++i) {
+            ImportModuleEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.name_offset) {
+                entry.name_offset -= address;
+            }
+
+            if (entry.import_indexed_symbol_table_offset) {
+                entry.import_indexed_symbol_table_offset -= address;
+            }
+
+            if (entry.import_anonymous_symbol_table_offset) {
+                entry.import_anonymous_symbol_table_offset -= address;
+            }
+
+            SetEntry(i, entry);
+        }
+    }
+
+    /// Unrebases offsets in exported named symbol table
+    void UnrebaseExportNamedSymbolTable() {
+        u32 export_named_symbol_num = GetField(ExportNamedSymbolNum);
+        for (u32 i = 0; i < export_named_symbol_num; ++i) {
+            ExportNamedSymbolEntry entry;
+            GetEntry(i, entry);
+
+            if (entry.name_offset) {
+                entry.name_offset -= address;
+            }
+
+            SetEntry(i, entry);
+        }
+    }
+
+    /// Unrebases offsets in segment table
+    void UnrebaseSegmentTable() {
+        u32 segment_num = GetField(SegmentNum);
+        for (u32 i = 0; i < segment_num; ++i) {
+            SegmentEntry segment;
+            GetEntry(i, segment);
+
+            if (segment.type == SegmentType::BSS) {
+                segment.offset = 0;
+            } else if (segment.offset) {
+                segment.offset -= address;
+            }
+
+            SetEntry(i, segment);
+        }
+    }
+
+    /// Unrebases offsets in module header
+    void UnrebaseHeader() {
+        u32 offset = GetField(NameOffset);
+        if (offset)
+            SetField(NameOffset, offset - address);
+
+        for (int field = CodeOffset; field < Fix0Barrier; field += 2) {
+            HeaderField header_field = static_cast<HeaderField>(field);
+            offset = GetField(header_field);
+            if (offset)
+                SetField(header_field, offset - address);
+        }
+    }
+
+    /**
      * Resolves the exit function in this module
      * @param crs_address the virtual address of the static module.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
@@ -1143,6 +1285,28 @@ public:
         }
 
         return RESULT_SUCCESS;
+    }
+
+    /**
+     * Unrebases the module.
+     * @param is_crs true if the module itself is the static module
+     */
+    void Unrebase(bool is_crs) {
+        UnrebaseImportAnonymousSymbolTable();
+        UnrebaseImportIndexedSymbolTable();
+        UnrebaseImportNamedSymbolTable();
+        UnrebaseImportModuleTable();
+        UnrebaseExportNamedSymbolTable();
+
+        if (!is_crs)
+            UnrebaseSegmentTable();
+
+        SetNext(0);
+        SetPrevious(0);
+
+        SetField(FixedSize, 0);
+
+        UnrebaseHeader();
     }
 
     void InitCRS() {
