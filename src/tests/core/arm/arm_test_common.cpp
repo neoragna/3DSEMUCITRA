@@ -63,15 +63,15 @@ u8 TestEnvironment::TestMemory::Read8(VAddr addr) {
 }
 
 u16 TestEnvironment::TestMemory::Read16(VAddr addr) {
-    return Read8(addr) | Read8(addr + 1) << 8;
+    return static_cast<u16>(Read8(addr)) | static_cast<u16>(Read8(addr + 1)) << 8;
 }
 
 u32 TestEnvironment::TestMemory::Read32(VAddr addr) {
-    return Read16(addr) | Read16(addr + 2) << 16;
+    return static_cast<u32>(Read16(addr)) | static_cast<u32>(Read16(addr + 2)) << 16;
 }
 
 u64 TestEnvironment::TestMemory::Read64(VAddr addr) {
-    return Read32(addr) | Read32(addr + 4) << 32;
+    return static_cast<u64>(Read32(addr)) | static_cast<u64>(Read32(addr + 4)) << 32;
 }
 
 bool TestEnvironment::TestMemory::ReadBlock(VAddr src_addr, void* dest_buffer, size_t size) {
