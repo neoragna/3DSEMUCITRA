@@ -1,6 +1,7 @@
 set(SRCS
             tests.cpp
             core/arm/arm_test_common.cpp
+            core/arm/dyncom/arm_dyncom_tests.cpp
             )
 
 set(HEADERS
