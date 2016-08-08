@@ -76,7 +76,7 @@ public:
     /// Whether this applet is currently running instead of the host application or not.
     bool started;
 
-    MiiConfig config;
+    MiiConfig config{};
 };
 
 }
