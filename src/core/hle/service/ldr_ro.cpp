@@ -384,7 +384,7 @@ class CROHelper final {
     template <typename FunctionObject>
     static ResultCode ForEachAutoLinkCRO(VAddr crs_address, FunctionObject func) {
         VAddr current = crs_address;
-        while (current) {
+        while (current != 0) {
             CROHelper cro(current);
             CASCADE_RESULT(bool next, func(cro));
             if (!next)
@@ -560,7 +560,7 @@ class CROHelper final {
             return error;
 
         // verifies not registered
-        if (GetField(NextCRO) || GetField(PreviousCRO))
+        if (GetField(NextCRO) != 0 || GetField(PreviousCRO) != 0)
             return error;
 
         // This seems to be a hard limit set by the RO module
@@ -568,7 +568,7 @@ class CROHelper final {
             return error;
 
         // verifies not fixed
-        if (GetField(FixedSize))
+        if (GetField(FixedSize) != 0)
             return error;
 
         if (GetField(CodeOffset) < CRO_HEADER_SIZE)
@@ -607,13 +607,13 @@ class CROHelper final {
 
         // rebases offsets
         u32 offset = GetField(NameOffset);
-        if (offset)
+        if (offset != 0)
             SetField(NameOffset, offset + module_address);
 
         for (int field = CodeOffset; field < Fix0Barrier; field += 2) {
             HeaderField header_field = static_cast<HeaderField>(field);
             offset = GetField(header_field);
-            if (offset)
+            if (offset != 0)
                 SetField(header_field, offset + module_address);
         }
 
@@ -636,7 +636,7 @@ class CROHelper final {
      * @returns ResultCode RESULT_SUCCESS if the size matches, otherwise error code.
      */
     static ResultCode VerifyString(VAddr address, u32 size) {
-        if (size) {
+        if (size != 0) {
             if (Memory::Read8(address + size - 1) != 0)
                 return CROFormatError(0x0B);
         }
@@ -661,19 +661,19 @@ class CROHelper final {
             SegmentEntry segment;
             GetEntry(i, segment);
             if (segment.type == SegmentType::Data) {
-                if (segment.size) {
+                if (segment.size != 0) {
                     if (segment.size > data_segment_size)
                         return ERROR_BUFFER_TOO_SMALL;
                     prev_data_segment = segment.offset;
                     segment.offset = data_segment_address;
                 }
             } else if (segment.type == SegmentType::BSS) {
-                if (segment.size) {
+                if (segment.size != 0) {
                     if (segment.size > bss_segment_size)
                         return ERROR_BUFFER_TOO_SMALL;
                     segment.offset = bss_segment_address;
                 }
-            } else if (segment.offset) {
+            } else if (segment.offset != 0) {
                 segment.offset += module_address;
                 if (segment.offset > module_address + cro_size)
                     return CROFormatError(0x19);
@@ -696,7 +696,7 @@ class CROHelper final {
             ExportNamedSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.name_offset) {
+            if (entry.name_offset != 0) {
                 entry.name_offset += module_address;
                 if (entry.name_offset < export_strings_offset
                     || entry.name_offset >= export_strings_end) {
@@ -743,7 +743,7 @@ class CROHelper final {
             ImportModuleEntry entry;
             GetEntry(i, entry);
 
-            if (entry.name_offset) {
+            if (entry.name_offset != 0) {
                 entry.name_offset += module_address;
                 if (entry.name_offset < import_strings_offset
                     || entry.name_offset >= import_strings_end) {
@@ -751,7 +751,7 @@ class CROHelper final {
                 }
             }
 
-            if (entry.import_indexed_symbol_table_offset) {
+            if (entry.import_indexed_symbol_table_offset != 0) {
                 entry.import_indexed_symbol_table_offset += module_address;
                 if (entry.import_indexed_symbol_table_offset < import_indexed_symbol_table_offset
                     || entry.import_indexed_symbol_table_offset > index_import_table_end) {
@@ -759,7 +759,7 @@ class CROHelper final {
                 }
             }
 
-            if (entry.import_anonymous_symbol_table_offset) {
+            if (entry.import_anonymous_symbol_table_offset != 0) {
                 entry.import_anonymous_symbol_table_offset += module_address;
                 if (entry.import_anonymous_symbol_table_offset < import_anonymous_symbol_table_offset
                     || entry.import_anonymous_symbol_table_offset > offset_import_table_end) {
@@ -787,7 +787,7 @@ class CROHelper final {
             ImportNamedSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.name_offset) {
+            if (entry.name_offset != 0) {
                 entry.name_offset += module_address;
                 if (entry.name_offset < import_strings_offset
                     || entry.name_offset >= import_strings_end) {
@@ -795,7 +795,7 @@ class CROHelper final {
                 }
             }
 
-            if (entry.patch_batch_offset) {
+            if (entry.patch_batch_offset != 0) {
                 entry.patch_batch_offset += module_address;
                 if (entry.patch_batch_offset < external_patch_table_offset
                     || entry.patch_batch_offset > external_patch_table_end) {
@@ -821,7 +821,7 @@ class CROHelper final {
             ImportIndexedSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.patch_batch_offset) {
+            if (entry.patch_batch_offset != 0) {
                 entry.patch_batch_offset += module_address;
                 if (entry.patch_batch_offset < external_patch_table_offset
                     || entry.patch_batch_offset > external_patch_table_end) {
@@ -847,7 +847,7 @@ class CROHelper final {
             ImportAnonymousSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.patch_batch_offset) {
+            if (entry.patch_batch_offset != 0) {
                 entry.patch_batch_offset += module_address;
                 if (entry.patch_batch_offset < external_patch_table_offset
                     || entry.patch_batch_offset > external_patch_table_end) {
@@ -1055,7 +1055,7 @@ class CROHelper final {
             ImportAnonymousSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.patch_batch_offset) {
+            if (entry.patch_batch_offset != 0) {
                 entry.patch_batch_offset -= module_address;
             }
 
@@ -1070,7 +1070,7 @@ class CROHelper final {
             ImportIndexedSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.patch_batch_offset) {
+            if (entry.patch_batch_offset != 0) {
                 entry.patch_batch_offset -= module_address;
             }
 
@@ -1085,7 +1085,7 @@ class CROHelper final {
             ImportNamedSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.name_offset) {
+            if (entry.name_offset != 0) {
                 entry.name_offset -= module_address;
             }
 
@@ -1104,7 +1104,7 @@ class CROHelper final {
             ImportModuleEntry entry;
             GetEntry(i, entry);
 
-            if (entry.name_offset) {
+            if (entry.name_offset != 0) {
                 entry.name_offset -= module_address;
             }
 
@@ -1127,7 +1127,7 @@ class CROHelper final {
             ExportNamedSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.name_offset) {
+            if (entry.name_offset != 0) {
                 entry.name_offset -= module_address;
             }
 
@@ -1144,7 +1144,7 @@ class CROHelper final {
 
             if (segment.type == SegmentType::BSS) {
                 segment.offset = 0;
-            } else if (segment.offset) {
+            } else if (segment.offset != 0) {
                 segment.offset -= module_address;
             }
 
@@ -1155,13 +1155,13 @@ class CROHelper final {
     /// Unrebases offsets in module header
     void UnrebaseHeader() {
         u32 offset = GetField(NameOffset);
-        if (offset)
+        if (offset != 0)
             SetField(NameOffset, offset - module_address);
 
         for (int field = CodeOffset; field < Fix0Barrier; field += 2) {
             HeaderField header_field = static_cast<HeaderField>(field);
             offset = GetField(header_field);
-            if (offset)
+            if (offset != 0)
                 SetField(header_field, offset - module_address);
         }
     }
@@ -1186,7 +1186,7 @@ class CROHelper final {
                     std::string symbol_name = Memory::ReadCString(entry.name_offset, import_strings_size);
                     u32 symbol_address = source.FindExportNamedSymbol(symbol_name);
 
-                    if (symbol_address) {
+                    if (symbol_address != 0) {
                         LOG_TRACE(Service_LDR, "CRO \"%s\" imports \"%s\" from \"%s\"",
                             ModuleName().data(), symbol_name.data(), source.ModuleName().data());
 
@@ -1357,7 +1357,7 @@ class CROHelper final {
             if (!patch_entry.is_batch_resolved) {
                 std::string symbol_name = Memory::ReadCString(entry.name_offset, target_import_strings_size);
                 u32 symbol_address = FindExportNamedSymbol(symbol_name);
-                if (symbol_address) {
+                if (symbol_address != 0) {
                     LOG_TRACE(Service_LDR, "    exports symbol \"%s\"", symbol_name.data());
                     ResultCode result = target.ApplyPatchBatch(patch_addr, symbol_address);
                     if (result.IsError()) {
@@ -1391,7 +1391,7 @@ class CROHelper final {
             if (patch_entry.is_batch_resolved) {
                 std::string symbol_name = Memory::ReadCString(entry.name_offset, target_import_strings_size);
                 u32 symbol_address = FindExportNamedSymbol(symbol_name);
-                if (symbol_address) {
+                if (symbol_address != 0) {
                     LOG_TRACE(Service_LDR, "    unexports symbol \"%s\"", symbol_name.data());
                     ResultCode result = target.ApplyPatchBatch(patch_addr, unresolved_symbol, true);
                     if (result.IsError()) {
@@ -1519,7 +1519,7 @@ class CROHelper final {
                 ResultCode result = ForEachAutoLinkCRO(crs_address, [&](CROHelper source) -> ResultVal<bool> {
                     u32 symbol_address = source.FindExportNamedSymbol("nnroAeabiAtexit_");
 
-                    if (symbol_address) {
+                    if (symbol_address != 0) {
                         LOG_DEBUG(Service_LDR, "CRO \"%s\" import exit function from \"%s\"",
                             ModuleName().data(), source.ModuleName().data());
 
@@ -2142,7 +2142,7 @@ static void Initialize(Service::Interface* self) {
 
     cmd_buff[0] = IPC::MakeHeader(1, 1, 0);
 
-    if (loaded_crs) {
+    if (loaded_crs != 0) {
         LOG_ERROR(Service_LDR, "Already initialized");
         cmd_buff[1] = ERROR_ALREADY_INITIALIZED.raw;
         return;
@@ -2354,7 +2354,7 @@ static void LoadCRO(Service::Interface* self, bool link_on_load_bug_fix) {
 
     cmd_buff[0] = IPC::MakeHeader(link_on_load_bug_fix ? 9 : 4, 2, 0);
 
-    if (!loaded_crs) {
+    if (loaded_crs == 0) {
         LOG_ERROR(Service_LDR, "Not initialized");
         cmd_buff[1] = ERROR_NOT_INITIALIZED.raw;
         return;
@@ -2545,7 +2545,7 @@ static void UnloadCRO(Service::Interface* self) {
 
     cmd_buff[0] = IPC::MakeHeader(5, 1, 0);
 
-    if (!loaded_crs) {
+    if (loaded_crs == 0) {
         LOG_ERROR(Service_LDR, "Not initialized");
         cmd_buff[1] = ERROR_NOT_INITIALIZED.raw;
         return;
@@ -2637,7 +2637,7 @@ static void LinkCRO(Service::Interface* self) {
 
     cmd_buff[0] = IPC::MakeHeader(6, 1, 0);
 
-    if (!loaded_crs) {
+    if (loaded_crs == 0) {
         LOG_ERROR(Service_LDR, "Not initialized");
         cmd_buff[1] = ERROR_NOT_INITIALIZED.raw;
         return;
@@ -2700,7 +2700,7 @@ static void UnlinkCRO(Service::Interface* self) {
 
     cmd_buff[0] = IPC::MakeHeader(7, 1, 0);
 
-    if (!loaded_crs) {
+    if (loaded_crs == 0) {
         LOG_ERROR(Service_LDR, "Not initialized");
         cmd_buff[1] = ERROR_NOT_INITIALIZED.raw;
         return;
@@ -2759,7 +2759,7 @@ static void Shutdown(Service::Interface* self) {
 
     memory_synchronizer.SynchronizeMappingMemory();
 
-    if (!loaded_crs) {
+    if (loaded_crs == 0) {
         LOG_ERROR(Service_LDR, "Not initialized");
         cmd_buff[1] = ERROR_NOT_INITIALIZED.raw;
         return;
