@@ -141,7 +141,7 @@ class CROHelper final {
         BitField<4, 28, u32_le> offset_into_segment;
 
         SegmentTag() = default;
-        SegmentTag(u32 raw_) : raw(raw_) {}
+        explicit SegmentTag(u32 raw_) : raw(raw_) {}
     };
 
     /// Information of a segment in this module.
@@ -854,11 +854,20 @@ class CROHelper final {
     }
 
     /**
+     * Gets the address of OnUnresolved function in this module.
+     * Used as the applied symbol for reset patch.
+     * @returns the virtual address of OnUnresolved. 0 if not provided.
+     */
+    VAddr GetOnUnresolvedAddress() {
+        return SegmentTagToAddress(SegmentTag(GetField(OnUnresolvedSegmentTag)));
+    }
+
+    /**
      * Resets all external patches to unresolved state.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
     ResultCode ResetExternalPatches() {
-        u32 unresolved_symbol = SegmentTagToAddress(GetField(OnUnresolvedSegmentTag));
+        u32 unresolved_symbol = GetOnUnresolvedAddress();
         u32 external_patch_num = GetField(ExternalPatchNum);
         ExternalPatchEntry patch;
 
@@ -1198,7 +1207,7 @@ class CROHelper final {
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
     ResultCode ResetImportNamedSymbol() {
-        u32 unresolved_symbol = SegmentTagToAddress(GetField(OnUnresolvedSegmentTag));
+        u32 unresolved_symbol = GetOnUnresolvedAddress();
 
         u32 symbol_import_num = GetField(ImportNamedSymbolNum);
         for (u32 i = 0; i < symbol_import_num; ++i) {
@@ -1223,7 +1232,7 @@ class CROHelper final {
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
     ResultCode ResetImportIndexedSymbol() {
-        u32 unresolved_symbol = SegmentTagToAddress(GetField(OnUnresolvedSegmentTag));
+        u32 unresolved_symbol = GetOnUnresolvedAddress();
 
         u32 import_num = GetField(ImportIndexedSymbolNum);
         for (u32 i = 0; i < import_num; ++i) {
@@ -1247,7 +1256,7 @@ class CROHelper final {
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
     ResultCode ResetImportAnonymousSymbol() {
-        u32 unresolved_symbol = SegmentTagToAddress(GetField(OnUnresolvedSegmentTag));
+        u32 unresolved_symbol = GetOnUnresolvedAddress();
 
         u32 import_num = GetField(ImportAnonymousSymbolNum);
         for (u32 i = 0; i < import_num; ++i) {
@@ -1362,7 +1371,7 @@ class CROHelper final {
     ResultCode ResetExportNamedSymbol(CROHelper target) {
         LOG_DEBUG(Service_LDR, "CRO \"%s\" unexports named symbols to \"%s\"",
             ModuleName().data(), target.ModuleName().data());
-        u32 unresolved_symbol = target.SegmentTagToAddress(target.GetField(OnUnresolvedSegmentTag));
+        u32 unresolved_symbol = target.GetOnUnresolvedAddress();
         u32 target_import_strings_size = target.GetField(ImportStringsSize);
         u32 target_symbol_import_num = target.GetField(ImportNamedSymbolNum);
         for (u32 i = 0; i < target_symbol_import_num; ++i) {
@@ -1444,7 +1453,7 @@ class CROHelper final {
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
     ResultCode ResetModuleExport(CROHelper target) {
-        u32 unresolved_symbol = target.SegmentTagToAddress(target.GetField(OnUnresolvedSegmentTag));
+        u32 unresolved_symbol = target.GetOnUnresolvedAddress();
 
         std::string module_name = ModuleName();
         u32 target_import_string_size = target.GetField(ImportStringsSize);
