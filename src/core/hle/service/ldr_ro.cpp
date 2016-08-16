@@ -711,8 +711,8 @@ class CROHelper final {
     }
 
     /**
-     * Verifies indeces in export tree table.
-     * @returns ResultCode RESULT_SUCCESS if all indeces are verified as valid, otherwise error code.
+     * Verifies indices in export tree table.
+     * @returns ResultCode RESULT_SUCCESS if all indices are verified as valid, otherwise error code.
      */
     ResultCode VerifyExportTreeTable() const {
         u32 tree_num = GetField(ExportTreeNum);
