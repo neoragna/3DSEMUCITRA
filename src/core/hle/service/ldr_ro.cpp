@@ -59,7 +59,7 @@ static ResultCode CROFormatError(u32 description) {
 
 /// Represents a loaded module (CRO) with interfaces manipulating it.
 class CROHelper final {
-    const VAddr address; ///< the virtual address of this module
+    const VAddr module_address; ///< the virtual address of this module
 
     /**
      * Each item in this enum represents a u32 field in the header begin from address+0x80, successively.
@@ -294,7 +294,7 @@ class CROHelper final {
     static constexpr u32 MAGIC_FIXD = 0x44584946;
 
     VAddr Field(HeaderField field) const {
-        return address + CRO_HASH_SIZE + field * 4;
+        return module_address + CRO_HASH_SIZE + field * 4;
     }
 
     u32 GetField(HeaderField field) const {
@@ -601,17 +601,17 @@ class CROHelper final {
         // rebases offsets
         u32 offset = GetField(NameOffset);
         if (offset)
-            SetField(NameOffset, offset + address);
+            SetField(NameOffset, offset + module_address);
 
         for (int field = CodeOffset; field < Fix0Barrier; field += 2) {
             HeaderField header_field = static_cast<HeaderField>(field);
             offset = GetField(header_field);
             if (offset)
-                SetField(header_field, offset + address);
+                SetField(header_field, offset + module_address);
         }
 
         // verifies everything is not beyond the buffer
-        u32 file_end = address + cro_size;
+        u32 file_end = module_address + cro_size;
         for (int field = CodeOffset, i = 0; field < Fix0Barrier; field += 2, ++i) {
             HeaderField offset_field = static_cast<HeaderField>(field);
             HeaderField size_field = static_cast<HeaderField>(field + 1);
@@ -667,8 +667,8 @@ class CROHelper final {
                     segment.offset = bss_segment_address;
                 }
             } else if (segment.offset) {
-                segment.offset += address;
-                if (segment.offset > address + cro_size)
+                segment.offset += module_address;
+                if (segment.offset > module_address + cro_size)
                     return CROFormatError(0x19);
             }
             SetEntry(i, segment);
@@ -690,7 +690,7 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.name_offset) {
-                entry.name_offset += address;
+                entry.name_offset += module_address;
                 if (entry.name_offset < export_strings_offset
                     || entry.name_offset >= export_strings_end) {
                     return CROFormatError(0x11);
@@ -737,7 +737,7 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.name_offset) {
-                entry.name_offset += address;
+                entry.name_offset += module_address;
                 if (entry.name_offset < import_strings_offset
                     || entry.name_offset >= import_strings_end) {
                     return CROFormatError(0x18);
@@ -745,7 +745,7 @@ class CROHelper final {
             }
 
             if (entry.import_indexed_symbol_table_offset) {
-                entry.import_indexed_symbol_table_offset += address;
+                entry.import_indexed_symbol_table_offset += module_address;
                 if (entry.import_indexed_symbol_table_offset < import_indexed_symbol_table_offset
                     || entry.import_indexed_symbol_table_offset > index_import_table_end) {
                     return CROFormatError(0x18);
@@ -753,7 +753,7 @@ class CROHelper final {
             }
 
             if (entry.import_anonymous_symbol_table_offset) {
-                entry.import_anonymous_symbol_table_offset += address;
+                entry.import_anonymous_symbol_table_offset += module_address;
                 if (entry.import_anonymous_symbol_table_offset < import_anonymous_symbol_table_offset
                     || entry.import_anonymous_symbol_table_offset > offset_import_table_end) {
                     return CROFormatError(0x18);
@@ -781,7 +781,7 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.name_offset) {
-                entry.name_offset += address;
+                entry.name_offset += module_address;
                 if (entry.name_offset < import_strings_offset
                     || entry.name_offset >= import_strings_end) {
                     return CROFormatError(0x1B);
@@ -789,7 +789,7 @@ class CROHelper final {
             }
 
             if (entry.patch_batch_offset) {
-                entry.patch_batch_offset += address;
+                entry.patch_batch_offset += module_address;
                 if (entry.patch_batch_offset < external_patch_table_offset
                     || entry.patch_batch_offset > external_patch_table_end) {
                     return CROFormatError(0x1B);
@@ -815,7 +815,7 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.patch_batch_offset) {
-                entry.patch_batch_offset += address;
+                entry.patch_batch_offset += module_address;
                 if (entry.patch_batch_offset < external_patch_table_offset
                     || entry.patch_batch_offset > external_patch_table_end) {
                     return CROFormatError(0x14);
@@ -841,7 +841,7 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.patch_batch_offset) {
-                entry.patch_batch_offset += address;
+                entry.patch_batch_offset += module_address;
                 if (entry.patch_batch_offset < external_patch_table_offset
                     || entry.patch_batch_offset > external_patch_table_end) {
                     return CROFormatError(0x17);
@@ -947,7 +947,7 @@ class CROHelper final {
         for (u32 i = 0; i < offset_export_num; ++i) {
             StaticAnonymousSymbolEntry entry;
             GetEntry(i, entry);
-            u32 batch_address = entry.patch_batch_offset + address;
+            u32 batch_address = entry.patch_batch_offset + module_address;
 
             if (batch_address < static_patch_table_offset
                 || batch_address > static_patch_table_end) {
@@ -1040,7 +1040,7 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.patch_batch_offset) {
-                entry.patch_batch_offset -= address;
+                entry.patch_batch_offset -= module_address;
             }
 
             SetEntry(i, entry);
@@ -1055,7 +1055,7 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.patch_batch_offset) {
-                entry.patch_batch_offset -= address;
+                entry.patch_batch_offset -= module_address;
             }
 
             SetEntry(i, entry);
@@ -1070,11 +1070,11 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.name_offset) {
-                entry.name_offset -= address;
+                entry.name_offset -= module_address;
             }
 
             if (entry.patch_batch_offset) {
-                entry.patch_batch_offset -= address;
+                entry.patch_batch_offset -= module_address;
             }
 
             SetEntry(i, entry);
@@ -1089,15 +1089,15 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.name_offset) {
-                entry.name_offset -= address;
+                entry.name_offset -= module_address;
             }
 
             if (entry.import_indexed_symbol_table_offset) {
-                entry.import_indexed_symbol_table_offset -= address;
+                entry.import_indexed_symbol_table_offset -= module_address;
             }
 
             if (entry.import_anonymous_symbol_table_offset) {
-                entry.import_anonymous_symbol_table_offset -= address;
+                entry.import_anonymous_symbol_table_offset -= module_address;
             }
 
             SetEntry(i, entry);
@@ -1112,7 +1112,7 @@ class CROHelper final {
             GetEntry(i, entry);
 
             if (entry.name_offset) {
-                entry.name_offset -= address;
+                entry.name_offset -= module_address;
             }
 
             SetEntry(i, entry);
@@ -1129,7 +1129,7 @@ class CROHelper final {
             if (segment.type == SegmentType::BSS) {
                 segment.offset = 0;
             } else if (segment.offset) {
-                segment.offset -= address;
+                segment.offset -= module_address;
             }
 
             SetEntry(i, segment);
@@ -1140,13 +1140,13 @@ class CROHelper final {
     void UnrebaseHeader() {
         u32 offset = GetField(NameOffset);
         if (offset)
-            SetField(NameOffset, offset - address);
+            SetField(NameOffset, offset - module_address);
 
         for (int field = CodeOffset; field < Fix0Barrier; field += 2) {
             HeaderField header_field = static_cast<HeaderField>(field);
             offset = GetField(header_field);
             if (offset)
-                SetField(header_field, offset - address);
+                SetField(header_field, offset - module_address);
         }
     }
 
@@ -1528,7 +1528,7 @@ class CROHelper final {
     }
 
 public:
-    explicit CROHelper(VAddr cro_address) : address(cro_address) {
+    explicit CROHelper(VAddr cro_address) : module_address(cro_address) {
     }
 
     std::string ModuleName() const {
@@ -1576,7 +1576,7 @@ public:
             }
             prev_data_segment_address = *result_val;
         }
-        prev_data_segment_address += address;
+        prev_data_segment_address += module_address;
 
         result = RebaseExportNamedSymbolTable();
         if (result.IsError()) {
@@ -1851,28 +1851,28 @@ public:
         CROHelper crs(crs_address);
         CROHelper head(auto_link ? crs.Next() : crs.Previous());
 
-        if (head.address) {
+        if (head.module_address) {
             // there are already CROs registered
             // register as the new tail
             CROHelper tail(head.Previous());
 
             // link with the old tail
             ASSERT(tail.Next() == 0);
-            SetPrevious(tail.address);
-            tail.SetNext(address);
+            SetPrevious(tail.module_address);
+            tail.SetNext(module_address);
 
             // set previous of the head pointing to the new tail
-            head.SetPrevious(address);
+            head.SetPrevious(module_address);
         } else {
             // register as the first CRO
             // set previous to self as tail
-            SetPrevious(address);
+            SetPrevious(module_address);
 
             // set self as head
             if (auto_link)
-                crs.SetNext(address);
+                crs.SetNext(module_address);
             else
-                crs.SetPrevious(address);
+                crs.SetPrevious(module_address);
         }
 
         // the new one is the tail
@@ -1888,34 +1888,34 @@ public:
         CROHelper next_head(crs.Next()), previous_head(crs.Previous());
         CROHelper next(Next()), previous(Previous());
 
-        if (address == next_head.address || address == previous_head.address) {
+        if (module_address == next_head.module_address || module_address == previous_head.module_address) {
             // removing head
-            if (next.address) {
+            if (next.module_address) {
                 // the next is new head
                 // let its previous point to the tail
-                next.SetPrevious(previous.address);
+                next.SetPrevious(previous.module_address);
             }
 
             // set new head
-            if (address == previous_head.address) {
-                crs.SetPrevious(next.address);
+            if (module_address == previous_head.module_address) {
+                crs.SetPrevious(next.module_address);
             } else {
-                crs.SetNext(next.address);
+                crs.SetNext(next.module_address);
             }
-        } else if (next.address) {
+        } else if (next.module_address) {
             // link previous and next
-            previous.SetNext(next.address);
-            next.SetPrevious(previous.address);
+            previous.SetNext(next.module_address);
+            next.SetPrevious(previous.module_address);
         } else {
             // removing tail
             // set previous as new tail
             previous.SetNext(0);
 
             // let head's previous point to the new tail
-            if (next_head.address && next_head.Previous() == address) {
-                next_head.SetPrevious(previous.address);
-            } else if (previous_head.address && previous_head.Previous() == address) {
-                previous_head.SetPrevious(previous.address);
+            if (next_head.module_address && next_head.Previous() == module_address) {
+                next_head.SetPrevious(previous.module_address);
+            } else if (previous_head.module_address && previous_head.Previous() == module_address) {
+                previous_head.SetPrevious(previous.module_address);
             } else {
                 UNREACHABLE();
             }
@@ -1969,7 +1969,7 @@ public:
 
         fix_end = Common::AlignUp(fix_end, Memory::PAGE_SIZE);
 
-        u32 fixed_size = fix_end - address;
+        u32 fixed_size = fix_end - module_address;
         SetField(FixedSize, fixed_size);
         return fixed_size;
     }
