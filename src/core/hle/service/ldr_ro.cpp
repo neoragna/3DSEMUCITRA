@@ -650,11 +650,12 @@ class CROHelper final {
      * @param data_segment_size the buffer size for .data segment
      * @param bss_segment_address the buffer address for .bss segment
      * @param bss_segment_size the buffer size for .bss segment
-     * @returns ResultVal<u32> with the previous data segment offset before rebasing.
+     * @returns ResultVal<VAddr> with the virtual address of .data segment in CRO.
      */
-    ResultVal<u32> RebaseSegmentTable(u32 cro_size,
+    ResultVal<VAddr> RebaseSegmentTable(u32 cro_size,
         VAddr data_segment_address, u32 data_segment_size,
         VAddr bss_segment_address, u32 bss_segment_size) {
+
         u32 prev_data_segment = 0;
         u32 segment_num = GetField(SegmentNum);
         for (u32 i = 0; i < segment_num; ++i) {
@@ -680,7 +681,7 @@ class CROHelper final {
             }
             SetEntry(i, segment);
         }
-        return MakeResult<u32>(prev_data_segment);
+        return MakeResult<u32>(prev_data_segment + module_address);
     }
 
     /**
@@ -1592,7 +1593,6 @@ public:
             }
             prev_data_segment_address = *result_val;
         }
-        prev_data_segment_address += module_address;
 
         result = RebaseExportNamedSymbolTable();
         if (result.IsError()) {
