@@ -635,7 +635,7 @@ class CROHelper final {
      * @param size the size of the string, including the terminating 0
      * @returns ResultCode RESULT_SUCCESS if the size matches, otherwise error code.
      */
-    static ResultCode VerifyString(VAddr address, u32 size) {
+    static ResultCode VerifyStringLength(VAddr address, u32 size) {
         if (size != 0) {
             if (Memory::Read8(address + size - 1) != 0)
                 return CROFormatError(0x0B);
@@ -1575,7 +1575,7 @@ public:
             return result;
         }
 
-        result = VerifyString(GetField(ModuleNameOffset), GetField(ModuleNameSize));
+        result = VerifyStringLength(GetField(ModuleNameOffset), GetField(ModuleNameSize));
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error verifying module name %08X", result.raw);
             return result;
@@ -1606,7 +1606,7 @@ public:
             return result;
         }
 
-        result = VerifyString(GetField(ExportStringsOffset), GetField(ExportStringsSize));
+        result = VerifyStringLength(GetField(ExportStringsOffset), GetField(ExportStringsSize));
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error verifying export strings %08X", result.raw);
             return result;
@@ -1642,7 +1642,7 @@ public:
             return result;
         }
 
-        result = VerifyString(GetField(ImportStringsOffset), GetField(ImportStringsSize));
+        result = VerifyStringLength(GetField(ImportStringsOffset), GetField(ImportStringsSize));
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error verifying import strings %08X", result.raw);
             return result;
