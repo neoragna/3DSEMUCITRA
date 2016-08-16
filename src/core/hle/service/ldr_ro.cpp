@@ -99,8 +99,8 @@ class CROHelper final {
 
         ImportModuleTableOffset,
         ImportModuleNum,
-        ExternalPatchTableOffset,
-        ExternalPatchNum,
+        ExternalRelocationTableOffset,
+        ExternalRelocationNum,
         ImportNamedSymbolTableOffset,
         ImportNamedSymbolNum,
         ImportIndexedSymbolTableOffset,
@@ -112,10 +112,10 @@ class CROHelper final {
 
         StaticAnonymousSymbolTableOffset,
         StaticAnonymousSymbolNum,
-        InternalPatchTableOffset,
-        InternalPatchNum,
-        StaticPatchTableOffset,
-        StaticPatchNum,
+        InternalRelocationTableOffset,
+        InternalRelocationNum,
+        StaticRelocationTableOffset,
+        StaticRelocationNum,
         Fix0Barrier,
 
         Fix3Barrier = ExportNamedSymbolTableOffset,
@@ -187,8 +187,8 @@ class CROHelper final {
 
     /// Identifies a named symbol imported from another module.
     struct ImportNamedSymbolEntry {
-        u32_le name_offset;        // pointing to a substring in ImportStrings
-        u32_le patch_batch_offset; // pointing to a patch batch in ExternalPatchTable
+        u32_le name_offset;             // pointing to a substring in ImportStrings
+        u32_le relocation_batch_offset; // pointing to a relocation batch in ExternalRelocationTable
 
         static constexpr HeaderField TABLE_OFFSET_FIELD = ImportNamedSymbolTableOffset;
     };
@@ -196,8 +196,8 @@ class CROHelper final {
 
     /// Identifies an indexed symbol imported from another module.
     struct ImportIndexedSymbolEntry {
-        u32_le index;              // index of an ExportIndexedSymbolEntry in the exporting module
-        u32_le patch_batch_offset; // pointing to a patch batch in ExternalPatchTable
+        u32_le index;                   // index of an ExportIndexedSymbolEntry in the exporting module
+        u32_le relocation_batch_offset; // pointing to a relocation batch in ExternalRelocationTable
 
         static constexpr HeaderField TABLE_OFFSET_FIELD = ImportIndexedSymbolTableOffset;
     };
@@ -205,8 +205,8 @@ class CROHelper final {
 
     /// Identifies an anonymous symbol imported from another module.
     struct ImportAnonymousSymbolEntry {
-        SegmentTag symbol_position; // in the exporting segment
-        u32_le patch_batch_offset;  // pointing to a patch batch in ExternalPatchTable
+        SegmentTag symbol_position;      // in the exporting segment
+        u32_le relocation_batch_offset;  // pointing to a relocation batch in ExternalRelocationTable
 
         static constexpr HeaderField TABLE_OFFSET_FIELD = ImportAnonymousSymbolTableOffset;
     };
@@ -234,7 +234,7 @@ class CROHelper final {
     };
     ASSERT_CRO_STRUCT(ImportModuleEntry, 20);
 
-    enum class PatchType : u8 {
+    enum class RelocationType : u8 {
         Nothing                = 0,
         AbsoluteAddress        = 2,
         RelativeAddress        = 3,
@@ -245,50 +245,50 @@ class CROHelper final {
         AlignedRelativeAddress = 42,
     };
 
-    struct PatchEntry {
-        SegmentTag target_position; // to self's segment as an ExternalPatchEntry; to static module segment as a StaticPatchEntry
-        PatchType type;
+    struct RelocationEntry {
+        SegmentTag target_position; // to self's segment as an ExternalRelocationEntry; to static module segment as a StaticRelocationEntry
+        RelocationType type;
         u8 is_batch_end;
         u8 is_batch_resolved;       // set at a batch beginning if the batch is resolved
         INSERT_PADDING_BYTES(1);
-        u32_le shift;
+        u32_le addend;
     };
 
-    /// Identifies a normal cross-module patch.
-    struct ExternalPatchEntry : PatchEntry {
-        static constexpr HeaderField TABLE_OFFSET_FIELD = ExternalPatchTableOffset;
+    /// Identifies a normal cross-module relocation.
+    struct ExternalRelocationEntry : RelocationEntry {
+        static constexpr HeaderField TABLE_OFFSET_FIELD = ExternalRelocationTableOffset;
     };
-    ASSERT_CRO_STRUCT(ExternalPatchEntry, 12);
+    ASSERT_CRO_STRUCT(ExternalRelocationEntry, 12);
 
-    /// Identifies a special static patch (no game is known using this).
-    struct StaticPatchEntry : PatchEntry {
-        static constexpr HeaderField TABLE_OFFSET_FIELD = StaticPatchTableOffset;
+    /// Identifies a special static relocation (no game is known using this).
+    struct StaticRelocationEntry : RelocationEntry {
+        static constexpr HeaderField TABLE_OFFSET_FIELD = StaticRelocationTableOffset;
     };
-    ASSERT_CRO_STRUCT(StaticPatchEntry, 12);
+    ASSERT_CRO_STRUCT(StaticRelocationEntry, 12);
 
-    /// Identifies a in-module patch.
-    struct InternalPatchEntry {
+    /// Identifies a in-module relocation.
+    struct InternalRelocationEntry {
         SegmentTag target_position; // to self's segment
-        PatchType type;
+        RelocationType type;
         u8 symbol_segment;
         INSERT_PADDING_BYTES(2);
-        u32_le shift;
+        u32_le addend;
 
-        static constexpr HeaderField TABLE_OFFSET_FIELD = InternalPatchTableOffset;
+        static constexpr HeaderField TABLE_OFFSET_FIELD = InternalRelocationTableOffset;
     };
-    ASSERT_CRO_STRUCT(InternalPatchEntry, 12);
+    ASSERT_CRO_STRUCT(InternalRelocationEntry, 12);
 
     /// Identifies a special static anonymous symbol (no game is known using this).
     struct StaticAnonymousSymbolEntry {
-        SegmentTag symbol_position; // to self's segment
-        u32_le patch_batch_offset;  // pointing to a patch batch in StaticPatchTable
+        SegmentTag symbol_position;      // to self's segment
+        u32_le relocation_batch_offset;  // pointing to a relocation batch in StaticRelocationTable
 
         static constexpr HeaderField TABLE_OFFSET_FIELD = StaticAnonymousSymbolTableOffset;
     };
     ASSERT_CRO_STRUCT(StaticAnonymousSymbolEntry, 8);
 
     /**
-     * Entry size of each table, from Code to StaticPatchTable.
+     * Entry size of each table, from Code to StaticRelocationTable.
      * Byte string contents (such as Code) are treated with entries of size 1.
      * This is used for verifying the size of each table and calculating the fix end.
      */
@@ -395,30 +395,30 @@ class CROHelper final {
     }
 
     /**
-     * Applies a patch
-     * @param target_address where to apply the patch
-     * @param patch_type the type of the patch
-     * @param shift address shift apply to the patched symbol
-     * @param symbol_address the symbol address to be patched with
+     * Applies a relocation
+     * @param target_address where to apply the relocation
+     * @param relocation_type the type of the relocation
+     * @param addend address addend applied to the relocated symbol
+     * @param symbol_address the symbol address to be relocated with
      * @param target_future_address the future address of the target.
      *        Usually equals to target_address, but will be different for a target in .data segment
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ApplyPatch(VAddr target_address, PatchType patch_type, u32 shift, u32 symbol_address, u32 target_future_address) {
-        switch (patch_type) {
-        case PatchType::Nothing:
+    ResultCode ApplyRelocation(VAddr target_address, RelocationType relocation_type, u32 addend, u32 symbol_address, u32 target_future_address) {
+        switch (relocation_type) {
+        case RelocationType::Nothing:
             break;
-        case PatchType::AbsoluteAddress:
-        case PatchType::AbsoluteAddress2:
-            Memory::Write32(target_address, symbol_address + shift);
+        case RelocationType::AbsoluteAddress:
+        case RelocationType::AbsoluteAddress2:
+            Memory::Write32(target_address, symbol_address + addend);
             break;
-        case PatchType::RelativeAddress:
-            Memory::Write32(target_address, symbol_address + shift - target_future_address);
+        case RelocationType::RelativeAddress:
+            Memory::Write32(target_address, symbol_address + addend - target_future_address);
             break;
-        case PatchType::ThumbBranch:
-        case PatchType::ArmBranch:
-        case PatchType::ModifyArmBranch:
-        case PatchType::AlignedRelativeAddress:
+        case RelocationType::ThumbBranch:
+        case RelocationType::ArmBranch:
+        case RelocationType::ModifyArmBranch:
+        case RelocationType::AlignedRelativeAddress:
             // TODO(wwylele): implement other types
             UNIMPLEMENTED();
             break;
@@ -429,24 +429,24 @@ class CROHelper final {
     }
 
     /**
-     * Clears a patch to zero
-     * @param target_address where to apply the patch
-     * @param patch_type the type of the patch
+     * Clears a relocation to zero
+     * @param target_address where to apply the relocation
+     * @param relocation_type the type of the relocation
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ClearPatch(VAddr target_address, PatchType patch_type) {
-        switch (patch_type) {
-        case PatchType::Nothing:
+    ResultCode ClearRelocation(VAddr target_address, RelocationType relocation_type) {
+        switch (relocation_type) {
+        case RelocationType::Nothing:
             break;
-        case PatchType::AbsoluteAddress:
-        case PatchType::AbsoluteAddress2:
-        case PatchType::RelativeAddress:
+        case RelocationType::AbsoluteAddress:
+        case RelocationType::AbsoluteAddress2:
+        case RelocationType::RelativeAddress:
             Memory::Write32(target_address, 0);
             break;
-        case PatchType::ThumbBranch:
-        case PatchType::ArmBranch:
-        case PatchType::ModifyArmBranch:
-        case PatchType::AlignedRelativeAddress:
+        case RelocationType::ThumbBranch:
+        case RelocationType::ArmBranch:
+        case RelocationType::ModifyArmBranch:
+        case RelocationType::AlignedRelativeAddress:
             // TODO(wwylele): implement other types
             UNIMPLEMENTED();
             break;
@@ -457,42 +457,42 @@ class CROHelper final {
     }
 
     /**
-     * Applies or resets a batch of patch
-     * @param batch the virtual address of the first patch in the batch
-     * @param symbol_address the symbol address to be patched with
+     * Applies or resets a batch of relocations
+     * @param batch the virtual address of the first relocation in the batch
+     * @param symbol_address the symbol address to be relocated with
      * @param reset false to set the batch to resolved state, true to reset the batch to unresolved state
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ApplyPatchBatch(VAddr batch, u32 symbol_address, bool reset = false) {
+    ResultCode ApplyRelocationBatch(VAddr batch, u32 symbol_address, bool reset = false) {
         if (symbol_address == 0 && !reset)
             return CROFormatError(0x10);
 
-        VAddr patch_address = batch;
+        VAddr relocation_address = batch;
         while (true) {
-            PatchEntry patch;
-            Memory::ReadBlock(patch_address, &patch, sizeof(PatchEntry));
+            RelocationEntry relocation;
+            Memory::ReadBlock(relocation_address, &relocation, sizeof(RelocationEntry));
 
-            VAddr patch_target = SegmentTagToAddress(patch.target_position);
-            if (patch_target == 0) {
+            VAddr relocation_target = SegmentTagToAddress(relocation.target_position);
+            if (relocation_target == 0) {
                 return CROFormatError(0x12);
             }
 
-            ResultCode result = ApplyPatch(patch_target, patch.type, patch.shift, symbol_address, patch_target);
+            ResultCode result = ApplyRelocation(relocation_target, relocation.type, relocation.addend, symbol_address, relocation_target);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error applying patch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error applying relocation %08X", result.raw);
                 return result;
             }
 
-            if (patch.is_batch_end)
+            if (relocation.is_batch_end)
                 break;
 
-            patch_address += sizeof(PatchEntry);
+            relocation_address += sizeof(RelocationEntry);
         }
 
-        PatchEntry patch;
-        Memory::ReadBlock(batch, &patch, sizeof(PatchEntry));
-        patch.is_batch_resolved = reset ? 0 : 1;
-        Memory::WriteBlock(batch, &patch, sizeof(PatchEntry));
+        RelocationEntry relocation;
+        Memory::ReadBlock(batch, &relocation, sizeof(RelocationEntry));
+        relocation.is_batch_resolved = reset ? 0 : 1;
+        Memory::WriteBlock(batch, &relocation, sizeof(RelocationEntry));
         return RESULT_SUCCESS;
     }
 
@@ -584,14 +584,14 @@ class CROHelper final {
             ExportIndexedSymbolTableOffset,
             ExportStringsOffset,
             ImportModuleTableOffset,
-            ExternalPatchTableOffset,
+            ExternalRelocationTableOffset,
             ImportNamedSymbolTableOffset,
             ImportIndexedSymbolTableOffset,
             ImportAnonymousSymbolTableOffset,
             ImportStringsOffset,
             StaticAnonymousSymbolTableOffset,
-            InternalPatchTableOffset,
-            StaticPatchTableOffset,
+            InternalRelocationTableOffset,
+            StaticRelocationTableOffset,
             DataOffset,
             FileSize
         }};
@@ -780,8 +780,8 @@ class CROHelper final {
     ResultCode RebaseImportNamedSymbolTable() {
         VAddr import_strings_offset = GetField(ImportStringsOffset);
         VAddr import_strings_end = import_strings_offset + GetField(ImportStringsSize);
-        VAddr external_patch_table_offset = GetField(ExternalPatchTableOffset);
-        VAddr external_patch_table_end = external_patch_table_offset + GetField(ExternalPatchNum) * sizeof(ExternalPatchEntry);
+        VAddr external_relocation_table_offset = GetField(ExternalRelocationTableOffset);
+        VAddr external_relocation_table_end = external_relocation_table_offset + GetField(ExternalRelocationNum) * sizeof(ExternalRelocationEntry);
 
         u32 num = GetField(ImportNamedSymbolNum);
         for (u32 i = 0; i < num ; ++i) {
@@ -796,10 +796,10 @@ class CROHelper final {
                 }
             }
 
-            if (entry.patch_batch_offset != 0) {
-                entry.patch_batch_offset += module_address;
-                if (entry.patch_batch_offset < external_patch_table_offset
-                    || entry.patch_batch_offset > external_patch_table_end) {
+            if (entry.relocation_batch_offset != 0) {
+                entry.relocation_batch_offset += module_address;
+                if (entry.relocation_batch_offset < external_relocation_table_offset
+                    || entry.relocation_batch_offset > external_relocation_table_end) {
                     return CROFormatError(0x1B);
                 }
             }
@@ -814,18 +814,18 @@ class CROHelper final {
      * @returns ResultCode RESULT_SUCCESS if all offsets are verified as valid, otherwise error code.
      */
     ResultCode RebaseImportIndexedSymbolTable() {
-        VAddr external_patch_table_offset = GetField(ExternalPatchTableOffset);
-        VAddr external_patch_table_end = external_patch_table_offset + GetField(ExternalPatchNum) * sizeof(ExternalPatchEntry);
+        VAddr external_relocation_table_offset = GetField(ExternalRelocationTableOffset);
+        VAddr external_relocation_table_end = external_relocation_table_offset + GetField(ExternalRelocationNum) * sizeof(ExternalRelocationEntry);
 
         u32 num = GetField(ImportIndexedSymbolNum);
         for (u32 i = 0; i < num ; ++i) {
             ImportIndexedSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.patch_batch_offset != 0) {
-                entry.patch_batch_offset += module_address;
-                if (entry.patch_batch_offset < external_patch_table_offset
-                    || entry.patch_batch_offset > external_patch_table_end) {
+            if (entry.relocation_batch_offset != 0) {
+                entry.relocation_batch_offset += module_address;
+                if (entry.relocation_batch_offset < external_relocation_table_offset
+                    || entry.relocation_batch_offset > external_relocation_table_end) {
                     return CROFormatError(0x14);
                 }
             }
@@ -840,18 +840,18 @@ class CROHelper final {
      * @returns ResultCode RESULT_SUCCESS if all offsets are verified as valid, otherwise error code.
      */
     ResultCode RebaseImportAnonymousSymbolTable() {
-        VAddr external_patch_table_offset = GetField(ExternalPatchTableOffset);
-        VAddr external_patch_table_end = external_patch_table_offset + GetField(ExternalPatchNum) * sizeof(ExternalPatchEntry);
+        VAddr external_relocation_table_offset = GetField(ExternalRelocationTableOffset);
+        VAddr external_relocation_table_end = external_relocation_table_offset + GetField(ExternalRelocationNum) * sizeof(ExternalRelocationEntry);
 
         u32 num = GetField(ImportAnonymousSymbolNum);
         for (u32 i = 0; i < num ; ++i) {
             ImportAnonymousSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.patch_batch_offset != 0) {
-                entry.patch_batch_offset += module_address;
-                if (entry.patch_batch_offset < external_patch_table_offset
-                    || entry.patch_batch_offset > external_patch_table_end) {
+            if (entry.relocation_batch_offset != 0) {
+                entry.relocation_batch_offset += module_address;
+                if (entry.relocation_batch_offset < external_relocation_table_offset
+                    || entry.relocation_batch_offset > external_relocation_table_end) {
                     return CROFormatError(0x17);
                 }
             }
@@ -863,7 +863,7 @@ class CROHelper final {
 
     /**
      * Gets the address of OnUnresolved function in this module.
-     * Used as the applied symbol for reset patch.
+     * Used as the applied symbol for reset relocation.
      * @returns the virtual address of OnUnresolved. 0 if not provided.
      */
     VAddr GetOnUnresolvedAddress() {
@@ -871,79 +871,79 @@ class CROHelper final {
     }
 
     /**
-     * Resets all external patches to unresolved state.
+     * Resets all external relocations to unresolved state.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ResetExternalPatches() {
+    ResultCode ResetExternalRelocations() {
         u32 unresolved_symbol = GetOnUnresolvedAddress();
-        u32 external_patch_num = GetField(ExternalPatchNum);
-        ExternalPatchEntry patch;
+        u32 external_relocation_num = GetField(ExternalRelocationNum);
+        ExternalRelocationEntry relocation;
 
-        // Verifies that the last patch is the end of a batch
-        GetEntry(external_patch_num - 1, patch);
-        if (!patch.is_batch_end) {
+        // Verifies that the last relocation is the end of a batch
+        GetEntry(external_relocation_num - 1, relocation);
+        if (!relocation.is_batch_end) {
             return CROFormatError(0x12);
         }
 
         bool batch_begin = true;
-        for (u32 i = 0; i < external_patch_num; ++i) {
-            GetEntry(i, patch);
-            VAddr patch_target = SegmentTagToAddress(patch.target_position);
+        for (u32 i = 0; i < external_relocation_num; ++i) {
+            GetEntry(i, relocation);
+            VAddr relocation_target = SegmentTagToAddress(relocation.target_position);
 
-            if (patch_target == 0) {
+            if (relocation_target == 0) {
                 return CROFormatError(0x12);
             }
 
-            ResultCode result = ApplyPatch(patch_target, patch.type, patch.shift, unresolved_symbol, patch_target);
+            ResultCode result = ApplyRelocation(relocation_target, relocation.type, relocation.addend, unresolved_symbol, relocation_target);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error applying patch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error applying relocation %08X", result.raw);
                 return result;
             }
 
             if (batch_begin) {
                 // resets to unresolved state
-                patch.is_batch_resolved = 0;
-                SetEntry(i, patch);
+                relocation.is_batch_resolved = 0;
+                SetEntry(i, relocation);
             }
 
             // if current is an end, then the next is a beginning
-            batch_begin = patch.is_batch_end != 0;
+            batch_begin = relocation.is_batch_end != 0;
         }
 
         return RESULT_SUCCESS;
     }
 
     /**
-     * Clears all external patches to zero.
+     * Clears all external relocations to zero.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ClearExternalPatches() {
-        u32 external_patch_num = GetField(ExternalPatchNum);
-        ExternalPatchEntry patch;
+    ResultCode ClearExternalRelocations() {
+        u32 external_relocation_num = GetField(ExternalRelocationNum);
+        ExternalRelocationEntry relocation;
 
         bool batch_begin = true;
-        for (u32 i = 0; i < external_patch_num; ++i) {
-            GetEntry(i, patch);
-            VAddr patch_target = SegmentTagToAddress(patch.target_position);
+        for (u32 i = 0; i < external_relocation_num; ++i) {
+            GetEntry(i, relocation);
+            VAddr relocation_target = SegmentTagToAddress(relocation.target_position);
 
-            if (patch_target == 0) {
+            if (relocation_target == 0) {
                 return CROFormatError(0x12);
             }
 
-            ResultCode result = ClearPatch(patch_target, patch.type);
+            ResultCode result = ClearRelocation(relocation_target, relocation.type);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error clearing patch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error clearing relocation %08X", result.raw);
                 return result;
             }
 
             if (batch_begin) {
                 // resets to unresolved state
-                patch.is_batch_resolved = 0;
-                SetEntry(i, patch);
+                relocation.is_batch_resolved = 0;
+                SetEntry(i, relocation);
             }
 
             // if current is an end, then the next is a beginning
-            batch_begin = patch.is_batch_end != 0;
+            batch_begin = relocation.is_batch_end != 0;
         }
 
         return RESULT_SUCCESS;
@@ -955,8 +955,8 @@ class CROHelper final {
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
     ResultCode ApplyStaticAnonymousSymbolToCRS(VAddr crs_address) {
-        VAddr static_patch_table_offset = GetField(StaticPatchTableOffset);
-        VAddr static_patch_table_end = static_patch_table_offset + GetField(StaticPatchNum) * sizeof(StaticPatchEntry);
+        VAddr static_relocation_table_offset = GetField(StaticRelocationTableOffset);
+        VAddr static_relocation_table_end = static_relocation_table_offset + GetField(StaticRelocationNum) * sizeof(StaticRelocationEntry);
 
         CROHelper crs(crs_address);
         u32 offset_export_num = GetField(StaticAnonymousSymbolNum);
@@ -964,18 +964,18 @@ class CROHelper final {
         for (u32 i = 0; i < offset_export_num; ++i) {
             StaticAnonymousSymbolEntry entry;
             GetEntry(i, entry);
-            u32 batch_address = entry.patch_batch_offset + module_address;
+            u32 batch_address = entry.relocation_batch_offset + module_address;
 
-            if (batch_address < static_patch_table_offset
-                || batch_address > static_patch_table_end) {
+            if (batch_address < static_relocation_table_offset
+                || batch_address > static_relocation_table_end) {
                 return CROFormatError(0x16);
             }
 
             u32 symbol_address = SegmentTagToAddress(entry.symbol_position);
             LOG_TRACE(Service_LDR, "CRO \"%s\" exports 0x%08X to the static module", ModuleName().data(), symbol_address);
-            ResultCode result = crs.ApplyPatchBatch(batch_address, symbol_address);
+            ResultCode result = crs.ApplyRelocationBatch(batch_address, symbol_address);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                 return result;
             }
         }
@@ -983,42 +983,42 @@ class CROHelper final {
     }
 
     /**
-     * Applies all internal patches to the module itself.
+     * Applies all internal relocations to the module itself.
      * @param old_data_segment_address the virtual address of data segment in CRO buffer
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ApplyInternalPatches(u32 old_data_segment_address) {
+    ResultCode ApplyInternalRelocations(u32 old_data_segment_address) {
         u32 segment_num = GetField(SegmentNum);
-        u32 internal_patch_num = GetField(InternalPatchNum);
-        for (u32 i = 0; i < internal_patch_num; ++i) {
-            InternalPatchEntry patch;
-            GetEntry(i, patch);
-            VAddr target_addressB = SegmentTagToAddress(patch.target_position);
+        u32 internal_relocation_num = GetField(InternalRelocationNum);
+        for (u32 i = 0; i < internal_relocation_num; ++i) {
+            InternalRelocationEntry relocation;
+            GetEntry(i, relocation);
+            VAddr target_addressB = SegmentTagToAddress(relocation.target_position);
             if (target_addressB == 0) {
                 return CROFormatError(0x15);
             }
 
             VAddr target_address;
             SegmentEntry target_segment;
-            GetEntry(patch.target_position.segment_index, target_segment);
+            GetEntry(relocation.target_position.segment_index, target_segment);
 
             if (target_segment.type == SegmentType::Data) {
-                // If the patch is to the .data segment, we need to patch it in the old buffer
-                target_address = old_data_segment_address + patch.target_position.offset_into_segment;
+                // If the relocation is to the .data segment, we need to relocate it in the old buffer
+                target_address = old_data_segment_address + relocation.target_position.offset_into_segment;
             } else {
                 target_address = target_addressB;
             }
 
-            if (patch.symbol_segment >= segment_num) {
+            if (relocation.symbol_segment >= segment_num) {
                 return CROFormatError(0x15);
             }
 
             SegmentEntry symbol_segment;
-            GetEntry(patch.symbol_segment, symbol_segment);
-            LOG_TRACE(Service_LDR, "Internally patches 0x%08X with 0x%08X", target_address, symbol_segment.offset);
-            ResultCode result = ApplyPatch(target_address, patch.type, patch.shift, symbol_segment.offset, target_addressB);
+            GetEntry(relocation.symbol_segment, symbol_segment);
+            LOG_TRACE(Service_LDR, "Internally relocates 0x%08X with 0x%08X", target_address, symbol_segment.offset);
+            ResultCode result = ApplyRelocation(target_address, relocation.type, relocation.addend, symbol_segment.offset, target_addressB);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error applying patch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error applying relocation %08X", result.raw);
                 return result;
             }
         }
@@ -1026,23 +1026,23 @@ class CROHelper final {
     }
 
     /**
-     * Clears all internal patches to zero.
+     * Clears all internal relocations to zero.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ClearInternalPatches() {
-        u32 internal_patch_num = GetField(InternalPatchNum);
-        for (u32 i = 0; i < internal_patch_num; ++i) {
-            InternalPatchEntry patch;
-            GetEntry(i, patch);
-            VAddr target_address = SegmentTagToAddress(patch.target_position);
+    ResultCode ClearInternalRelocations() {
+        u32 internal_relocation_num = GetField(InternalRelocationNum);
+        for (u32 i = 0; i < internal_relocation_num; ++i) {
+            InternalRelocationEntry relocation;
+            GetEntry(i, relocation);
+            VAddr target_address = SegmentTagToAddress(relocation.target_position);
 
             if (target_address == 0) {
                 return CROFormatError(0x15);
             }
 
-            ResultCode result = ClearPatch(target_address, patch.type);
+            ResultCode result = ClearRelocation(target_address, relocation.type);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error clearing patch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error clearing relocation %08X", result.raw);
                 return result;
             }
         }
@@ -1056,8 +1056,8 @@ class CROHelper final {
             ImportAnonymousSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.patch_batch_offset != 0) {
-                entry.patch_batch_offset -= module_address;
+            if (entry.relocation_batch_offset != 0) {
+                entry.relocation_batch_offset -= module_address;
             }
 
             SetEntry(i, entry);
@@ -1071,8 +1071,8 @@ class CROHelper final {
             ImportIndexedSymbolEntry entry;
             GetEntry(i, entry);
 
-            if (entry.patch_batch_offset != 0) {
-                entry.patch_batch_offset -= module_address;
+            if (entry.relocation_batch_offset != 0) {
+                entry.relocation_batch_offset -= module_address;
             }
 
             SetEntry(i, entry);
@@ -1090,8 +1090,8 @@ class CROHelper final {
                 entry.name_offset -= module_address;
             }
 
-            if (entry.patch_batch_offset) {
-                entry.patch_batch_offset -= module_address;
+            if (entry.relocation_batch_offset) {
+                entry.relocation_batch_offset -= module_address;
             }
 
             SetEntry(i, entry);
@@ -1178,11 +1178,11 @@ class CROHelper final {
         for (u32 i = 0; i < symbol_import_num; ++i) {
             ImportNamedSymbolEntry entry;
             GetEntry(i, entry);
-            VAddr patch_addr = entry.patch_batch_offset;
-            ExternalPatchEntry patch_entry;
-            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+            VAddr relocation_addr = entry.relocation_batch_offset;
+            ExternalRelocationEntry relocation_entry;
+            Memory::ReadBlock(relocation_addr, &relocation_entry, sizeof(ExternalRelocationEntry));
 
-            if (!patch_entry.is_batch_resolved) {
+            if (!relocation_entry.is_batch_resolved) {
                 ResultCode result = ForEachAutoLinkCRO(crs_address, [&](CROHelper source) -> ResultVal<bool> {
                     std::string symbol_name = Memory::ReadCString(entry.name_offset, import_strings_size);
                     u32 symbol_address = source.FindExportNamedSymbol(symbol_name);
@@ -1191,9 +1191,9 @@ class CROHelper final {
                         LOG_TRACE(Service_LDR, "CRO \"%s\" imports \"%s\" from \"%s\"",
                             ModuleName().data(), symbol_name.data(), source.ModuleName().data());
 
-                        ResultCode result = ApplyPatchBatch(patch_addr, symbol_address);
+                        ResultCode result = ApplyRelocationBatch(relocation_addr, symbol_address);
                         if (result.IsError()) {
-                            LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                            LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                             return result;
                         }
 
@@ -1221,13 +1221,13 @@ class CROHelper final {
         for (u32 i = 0; i < symbol_import_num; ++i) {
             ImportNamedSymbolEntry entry;
             GetEntry(i, entry);
-            VAddr patch_addr = entry.patch_batch_offset;
-            ExternalPatchEntry patch_entry;
-            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+            VAddr relocation_addr = entry.relocation_batch_offset;
+            ExternalRelocationEntry relocation_entry;
+            Memory::ReadBlock(relocation_addr, &relocation_entry, sizeof(ExternalRelocationEntry));
 
-            ResultCode result = ApplyPatchBatch(patch_addr, unresolved_symbol, true);
+            ResultCode result = ApplyRelocationBatch(relocation_addr, unresolved_symbol, true);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error reseting patch batch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error reseting relocation batch %08X", result.raw);
                 return result;
             }
 
@@ -1246,13 +1246,13 @@ class CROHelper final {
         for (u32 i = 0; i < import_num; ++i) {
             ImportIndexedSymbolEntry entry;
             GetEntry(i, entry);
-            VAddr patch_addr = entry.patch_batch_offset;
-            ExternalPatchEntry patch_entry;
-            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+            VAddr relocation_addr = entry.relocation_batch_offset;
+            ExternalRelocationEntry relocation_entry;
+            Memory::ReadBlock(relocation_addr, &relocation_entry, sizeof(ExternalRelocationEntry));
 
-            ResultCode result = ApplyPatchBatch(patch_addr, unresolved_symbol, true);
+            ResultCode result = ApplyRelocationBatch(relocation_addr, unresolved_symbol, true);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error reseting patch batch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error reseting relocation batch %08X", result.raw);
                 return result;
             }
         }
@@ -1270,13 +1270,13 @@ class CROHelper final {
         for (u32 i = 0; i < import_num; ++i) {
             ImportAnonymousSymbolEntry entry;
             GetEntry(i, entry);
-            VAddr patch_addr = entry.patch_batch_offset;
-            ExternalPatchEntry patch_entry;
-            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+            VAddr relocation_addr = entry.relocation_batch_offset;
+            ExternalRelocationEntry relocation_entry;
+            Memory::ReadBlock(relocation_addr, &relocation_entry, sizeof(ExternalRelocationEntry));
 
-            ResultCode result = ApplyPatchBatch(patch_addr, unresolved_symbol, true);
+            ResultCode result = ApplyRelocationBatch(relocation_addr, unresolved_symbol, true);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error reseting patch batch %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error reseting relocation batch %08X", result.raw);
                 return result;
             }
         }
@@ -1308,9 +1308,9 @@ class CROHelper final {
                         source.GetEntry(im.index, ex);
                         u32 symbol_address = source.SegmentTagToAddress(ex.symbol_position);
                         LOG_TRACE(Service_LDR, "    Imports 0x%08X", symbol_address);
-                        ResultCode result = ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                        ResultCode result = ApplyRelocationBatch(im.relocation_batch_offset, symbol_address);
                         if (result.IsError()) {
-                            LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                            LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                             return result;
                         }
                     }
@@ -1321,9 +1321,9 @@ class CROHelper final {
                         entry.GetImportAnonymousSymbolEntry(j, im);
                         u32 symbol_address = source.SegmentTagToAddress(im.symbol_position);
                         LOG_TRACE(Service_LDR, "    Imports 0x%08X", symbol_address);
-                        ResultCode result = ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                        ResultCode result = ApplyRelocationBatch(im.relocation_batch_offset, symbol_address);
                         if (result.IsError()) {
-                            LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                            LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                             return result;
                         }
                     }
@@ -1351,18 +1351,18 @@ class CROHelper final {
         for (u32 i = 0; i < target_symbol_import_num; ++i) {
             ImportNamedSymbolEntry entry;
             target.GetEntry(i, entry);
-            VAddr patch_addr = entry.patch_batch_offset;
-            ExternalPatchEntry patch_entry;
-            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+            VAddr relocation_addr = entry.relocation_batch_offset;
+            ExternalRelocationEntry relocation_entry;
+            Memory::ReadBlock(relocation_addr, &relocation_entry, sizeof(ExternalRelocationEntry));
 
-            if (!patch_entry.is_batch_resolved) {
+            if (!relocation_entry.is_batch_resolved) {
                 std::string symbol_name = Memory::ReadCString(entry.name_offset, target_import_strings_size);
                 u32 symbol_address = FindExportNamedSymbol(symbol_name);
                 if (symbol_address != 0) {
                     LOG_TRACE(Service_LDR, "    exports symbol \"%s\"", symbol_name.data());
-                    ResultCode result = target.ApplyPatchBatch(patch_addr, symbol_address);
+                    ResultCode result = target.ApplyRelocationBatch(relocation_addr, symbol_address);
                     if (result.IsError()) {
-                        LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                        LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                         return result;
                     }
                 }
@@ -1385,18 +1385,18 @@ class CROHelper final {
         for (u32 i = 0; i < target_symbol_import_num; ++i) {
             ImportNamedSymbolEntry entry;
             target.GetEntry(i, entry);
-            VAddr patch_addr = entry.patch_batch_offset;
-            ExternalPatchEntry patch_entry;
-            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+            VAddr relocation_addr = entry.relocation_batch_offset;
+            ExternalRelocationEntry relocation_entry;
+            Memory::ReadBlock(relocation_addr, &relocation_entry, sizeof(ExternalRelocationEntry));
 
-            if (patch_entry.is_batch_resolved) {
+            if (relocation_entry.is_batch_resolved) {
                 std::string symbol_name = Memory::ReadCString(entry.name_offset, target_import_strings_size);
                 u32 symbol_address = FindExportNamedSymbol(symbol_name);
                 if (symbol_address != 0) {
                     LOG_TRACE(Service_LDR, "    unexports symbol \"%s\"", symbol_name.data());
-                    ResultCode result = target.ApplyPatchBatch(patch_addr, unresolved_symbol, true);
+                    ResultCode result = target.ApplyRelocationBatch(relocation_addr, unresolved_symbol, true);
                     if (result.IsError()) {
-                        LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                        LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                         return result;
                     }
                 }
@@ -1430,9 +1430,9 @@ class CROHelper final {
                 GetEntry(im.index, ex);
                 u32 symbol_address = SegmentTagToAddress(ex.symbol_position);
                 LOG_TRACE(Service_LDR, "    exports symbol 0x%08X", symbol_address);
-                ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                ResultCode result = target.ApplyRelocationBatch(im.relocation_batch_offset, symbol_address);
                 if (result.IsError()) {
-                    LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                    LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                     return result;
                 }
             }
@@ -1444,9 +1444,9 @@ class CROHelper final {
                 entry.GetImportAnonymousSymbolEntry(j, im);
                 u32 symbol_address = SegmentTagToAddress(im.symbol_position);
                 LOG_TRACE(Service_LDR, "    exports symbol 0x%08X", symbol_address);
-                ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, symbol_address);
+                ResultCode result = target.ApplyRelocationBatch(im.relocation_batch_offset, symbol_address);
                 if (result.IsError()) {
-                    LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                    LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                     return result;
                 }
             }
@@ -1478,9 +1478,9 @@ class CROHelper final {
             for (u32 j = 0; j < entry.import_indexed_symbol_num; ++j) {
                 ImportIndexedSymbolEntry im;
                 entry.GetImportIndexedSymbolEntry(j, im);
-                ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, unresolved_symbol, true);
+                ResultCode result = target.ApplyRelocationBatch(im.relocation_batch_offset, unresolved_symbol, true);
                 if (result.IsError()) {
-                    LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                    LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                     return result;
                 }
             }
@@ -1490,9 +1490,9 @@ class CROHelper final {
             for (u32 j = 0; j < entry.import_anonymous_symbol_num; ++j) {
                 ImportAnonymousSymbolEntry im;
                 entry.GetImportAnonymousSymbolEntry(j, im);
-                ResultCode result = target.ApplyPatchBatch(im.patch_batch_offset, unresolved_symbol, true);
+                ResultCode result = target.ApplyRelocationBatch(im.relocation_batch_offset, unresolved_symbol, true);
                 if (result.IsError()) {
-                    LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                    LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                     return result;
                 }
             }
@@ -1506,15 +1506,15 @@ class CROHelper final {
      * @param crs_address the virtual address of the static module.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ApplyExitPatches(VAddr crs_address) {
+    ResultCode ApplyExitRelocations(VAddr crs_address) {
         u32 import_strings_size = GetField(ImportStringsSize);
         u32 symbol_import_num = GetField(ImportNamedSymbolNum);
         for (u32 i = 0; i < symbol_import_num; ++i) {
             ImportNamedSymbolEntry entry;
             GetEntry(i, entry);
-            VAddr patch_addr = entry.patch_batch_offset;
-            ExternalPatchEntry patch_entry;
-            Memory::ReadBlock(patch_addr, &patch_entry, sizeof(ExternalPatchEntry));
+            VAddr relocation_addr = entry.relocation_batch_offset;
+            ExternalRelocationEntry relocation_entry;
+            Memory::ReadBlock(relocation_addr, &relocation_entry, sizeof(ExternalRelocationEntry));
 
             if (Memory::ReadCString(entry.name_offset, import_strings_size) == "__aeabi_atexit"){
                 ResultCode result = ForEachAutoLinkCRO(crs_address, [&](CROHelper source) -> ResultVal<bool> {
@@ -1524,9 +1524,9 @@ class CROHelper final {
                         LOG_DEBUG(Service_LDR, "CRO \"%s\" import exit function from \"%s\"",
                             ModuleName().data(), source.ModuleName().data());
 
-                        ResultCode result = ApplyPatchBatch(patch_addr, symbol_address);
+                        ResultCode result = ApplyRelocationBatch(relocation_addr, symbol_address);
                         if (result.IsError()) {
-                            LOG_ERROR(Service_LDR, "Error applying patch batch %08X", result.raw);
+                            LOG_ERROR(Service_LDR, "Error applying relocation batch %08X", result.raw);
                             return result;
                         }
 
@@ -1536,7 +1536,7 @@ class CROHelper final {
                     return MakeResult<bool>(true);
                 });
                 if (result.IsError()) {
-                    LOG_ERROR(Service_LDR, "Error applying exit patch %08X", result.raw);
+                    LOG_ERROR(Service_LDR, "Error applying exit relocation %08X", result.raw);
                     return result;
                 }
             }
@@ -1618,9 +1618,9 @@ public:
             return result;
         }
 
-        result = ResetExternalPatches();
+        result = ResetExternalRelocations();
         if (result.IsError()) {
-            LOG_ERROR(Service_LDR, "Error resetting all external patches %08X", result.raw);
+            LOG_ERROR(Service_LDR, "Error resetting all external relocations %08X", result.raw);
             return result;
         }
 
@@ -1656,16 +1656,16 @@ public:
             }
         }
 
-        result = ApplyInternalPatches(prev_data_segment_address);
+        result = ApplyInternalRelocations(prev_data_segment_address);
         if (result.IsError()) {
-            LOG_ERROR(Service_LDR, "Error applying internal patches %08X", result.raw);
+            LOG_ERROR(Service_LDR, "Error applying internal relocations %08X", result.raw);
             return result;
         }
 
         if (!is_crs) {
-            result = ApplyExitPatches(crs_address);
+            result = ApplyExitRelocations(crs_address);
             if (result.IsError()) {
-                LOG_ERROR(Service_LDR, "Error applying exit patches %08X", result.raw);
+                LOG_ERROR(Service_LDR, "Error applying exit relocations %08X", result.raw);
                 return result;
             }
         }
@@ -1720,10 +1720,10 @@ public:
             if (link_on_load_bug_fix) {
                 // this is a bug fix introduced by 7.2.0-17's LoadCRO_New
                 // The bug itself is:
-                // If a patch target is in .data segment, it will patch to the
+                // If a relocation target is in .data segment, it will relocate to the
                 // user-specified buffer. But if this is linking during loading,
                 // the .data segment hasn't been tranfer from CRO to the buffer,
-                // thus the patch will be overwritten by data transfer.
+                // thus the relocation will be overwritten by data transfer.
                 // To fix this bug, we need temporarily restore the old .data segment
                 // offset and apply imported symbols.
 
@@ -1835,19 +1835,19 @@ public:
     }
 
     /**
-     * Clears all patches to zero.
+     * Clears all relocations to zero.
      * @returns ResultCode RESULT_SUCCESS on success, otherwise error code.
      */
-    ResultCode ClearPatches() {
-        ResultCode result = ClearExternalPatches();
+    ResultCode ClearRelocations() {
+        ResultCode result = ClearExternalRelocations();
         if (result.IsError()) {
-            LOG_ERROR(Service_LDR, "Error clearing external patches %08X", result.raw);
+            LOG_ERROR(Service_LDR, "Error clearing external relocations %08X", result.raw);
             return result;
         }
 
-        result = ClearInternalPatches();
+        result = ClearInternalRelocations();
         if (result.IsError()) {
-            LOG_ERROR(Service_LDR, "Error clearing internal patches %08X", result.raw);
+            LOG_ERROR(Service_LDR, "Error clearing internal relocations %08X", result.raw);
             return result;
         }
         return RESULT_SUCCESS;
@@ -2037,14 +2037,14 @@ const std::array<int, 17> CROHelper::ENTRY_SIZE {{
     1, // export strings
     sizeof(ExportTreeEntry),
     sizeof(ImportModuleEntry),
-    sizeof(ExternalPatchEntry),
+    sizeof(ExternalRelocationEntry),
     sizeof(ImportNamedSymbolEntry),
     sizeof(ImportIndexedSymbolEntry),
     sizeof(ImportAnonymousSymbolEntry),
     1, // import strings
     sizeof(StaticAnonymousSymbolEntry),
-    sizeof(InternalPatchEntry),
-    sizeof(StaticPatchEntry)
+    sizeof(InternalRelocationEntry),
+    sizeof(StaticRelocationEntry)
 }};
 
 const std::array<CROHelper::HeaderField, 4> CROHelper::FIX_BARRIERS {{
@@ -2576,12 +2576,12 @@ static void UnloadCRO(Service::Interface* self) {
         return;
     }
 
-    // If the module is not fixed, clears all external/internal patches
+    // If the module is not fixed, clears all external/internal relocations
     // to restore the state before loading, so that it can be loaded again(?)
     if (!cro.IsFixed()) {
-        result = cro.ClearPatches();
+        result = cro.ClearRelocations();
         if (result.IsError()) {
-            LOG_ERROR(Service_LDR, "Error clearing patches %08X", result.raw);
+            LOG_ERROR(Service_LDR, "Error clearing relocations %08X", result.raw);
             cmd_buff[1] = result.raw;
             return;
         }
