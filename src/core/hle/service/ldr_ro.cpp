@@ -185,7 +185,7 @@ class CROHelper final {
     };
     ASSERT_CRO_STRUCT(ExportTreeEntry, 8);
 
-    /// Identifies a named symbol imported from other module.
+    /// Identifies a named symbol imported from another module.
     struct ImportNamedSymbolEntry {
         u32_le name_offset;        // pointing to a substring in ImportStrings
         u32_le patch_batch_offset; // pointing to a patch batch in ExternalPatchTable
@@ -194,27 +194,27 @@ class CROHelper final {
     };
     ASSERT_CRO_STRUCT(ImportNamedSymbolEntry, 8);
 
-    /// Identifies an indexed symbol imported from other module.
+    /// Identifies an indexed symbol imported from another module.
     struct ImportIndexedSymbolEntry {
-        u32_le index;              // index of an opponent's ExportIndexedSymbolEntry
+        u32_le index;              // index of an ExportIndexedSymbolEntry in the exporting module
         u32_le patch_batch_offset; // pointing to a patch batch in ExternalPatchTable
 
         static constexpr HeaderField TABLE_OFFSET_FIELD = ImportIndexedSymbolTableOffset;
     };
     ASSERT_CRO_STRUCT(ImportIndexedSymbolEntry, 8);
 
-    /// Identifies an anonymous symbol imported from other module.
+    /// Identifies an anonymous symbol imported from another module.
     struct ImportAnonymousSymbolEntry {
-        SegmentTag symbol_position; // to the opponent's segment
+        SegmentTag symbol_position; // in the exporting segment
         u32_le patch_batch_offset;  // pointing to a patch batch in ExternalPatchTable
 
         static constexpr HeaderField TABLE_OFFSET_FIELD = ImportAnonymousSymbolTableOffset;
     };
     ASSERT_CRO_STRUCT(ImportAnonymousSymbolEntry, 8);
 
-    /// Information of a referred module and symbols imported from it.
+    /// Information of a imported module and symbols imported from it.
     struct ImportModuleEntry {
-        u32_le name_offset;                          // pointing to a substring in ImporStrings
+        u32_le name_offset;                          // pointing to a substring in ImportStrings
         u32_le import_indexed_symbol_table_offset;   // pointing to a subtable in ImportIndexedSymbolTable
         u32_le import_indexed_symbol_num;
         u32_le import_anonymous_symbol_table_offset; // pointing to a subtable in ImportAnonymousSymbolTable
@@ -287,8 +287,15 @@ class CROHelper final {
     };
     ASSERT_CRO_STRUCT(StaticAnonymousSymbolEntry, 8);
 
-    static std::array<int, 17> ENTRY_SIZE;
-    static std::array<HeaderField, 4> FIX_BARRIERS;
+    /**
+     * Entry size of each table, from Code to StaticPatchTable.
+     * Byte string contents (such as Code) are treated with entries of size 1.
+     * This is used for verifying the size of each table and calculating the fix end.
+     */
+    static const std::array<int, 17> ENTRY_SIZE;
+
+    /// The offset field of the table where to crop for each fix level
+    static const std::array<HeaderField, 4> FIX_BARRIERS;
 
     static constexpr u32 MAGIC_CRO0 = 0x304F5243;
     static constexpr u32 MAGIC_FIXD = 0x44584946;
@@ -349,19 +356,19 @@ class CROHelper final {
         return entry.offset + segment_tag.offset_into_segment;
     }
 
-    VAddr Next() const {
+    VAddr NextModule() const {
         return GetField(NextCRO);
     }
 
-    VAddr Previous() const {
+    VAddr PreviousModule() const {
         return GetField(PreviousCRO);
     }
 
-    void SetNext(VAddr next) {
+    void SetNextModule(VAddr next) {
         SetField(NextCRO, next);
     }
 
-    void SetPrevious(VAddr previous) {
+    void SetPreviousModule(VAddr previous) {
         SetField(PreviousCRO, previous);
     }
 
@@ -382,7 +389,7 @@ class CROHelper final {
             CASCADE_RESULT(bool next, func(cro));
             if (!next)
                 break;
-            current = cro.Next();
+            current = cro.NextModule();
         }
         return RESULT_SUCCESS;
     }
@@ -1680,8 +1687,8 @@ public:
         if (!is_crs)
             UnrebaseSegmentTable();
 
-        SetNext(0);
-        SetPrevious(0);
+        SetNextModule(0);
+        SetPreviousModule(0);
 
         SetField(FixedSize, 0);
 
@@ -1847,8 +1854,8 @@ public:
     }
 
     void InitCRS() {
-        SetNext(0);
-        SetPrevious(0);
+        SetNextModule(0);
+        SetPreviousModule(0);
     }
 
     /**
@@ -1858,34 +1865,34 @@ public:
      */
     void Register(VAddr crs_address, bool auto_link) {
         CROHelper crs(crs_address);
-        CROHelper head(auto_link ? crs.Next() : crs.Previous());
+        CROHelper head(auto_link ? crs.NextModule() : crs.PreviousModule());
 
         if (head.module_address) {
             // there are already CROs registered
             // register as the new tail
-            CROHelper tail(head.Previous());
+            CROHelper tail(head.PreviousModule());
 
             // link with the old tail
-            ASSERT(tail.Next() == 0);
-            SetPrevious(tail.module_address);
-            tail.SetNext(module_address);
+            ASSERT(tail.NextModule() == 0);
+            SetPreviousModule(tail.module_address);
+            tail.SetNextModule(module_address);
 
             // set previous of the head pointing to the new tail
-            head.SetPrevious(module_address);
+            head.SetPreviousModule(module_address);
         } else {
             // register as the first CRO
             // set previous to self as tail
-            SetPrevious(module_address);
+            SetPreviousModule(module_address);
 
             // set self as head
             if (auto_link)
-                crs.SetNext(module_address);
+                crs.SetNextModule(module_address);
             else
-                crs.SetPrevious(module_address);
+                crs.SetPreviousModule(module_address);
         }
 
         // the new one is the tail
-        SetNext(0);
+        SetNextModule(0);
     }
 
     /**
@@ -1894,45 +1901,45 @@ public:
      */
     void Unregister(VAddr crs_address) {
         CROHelper crs(crs_address);
-        CROHelper next_head(crs.Next()), previous_head(crs.Previous());
-        CROHelper next(Next()), previous(Previous());
+        CROHelper next_head(crs.NextModule()), previous_head(crs.PreviousModule());
+        CROHelper next(NextModule()), previous(PreviousModule());
 
         if (module_address == next_head.module_address || module_address == previous_head.module_address) {
             // removing head
             if (next.module_address) {
                 // the next is new head
                 // let its previous point to the tail
-                next.SetPrevious(previous.module_address);
+                next.SetPreviousModule(previous.module_address);
             }
 
             // set new head
             if (module_address == previous_head.module_address) {
-                crs.SetPrevious(next.module_address);
+                crs.SetPreviousModule(next.module_address);
             } else {
-                crs.SetNext(next.module_address);
+                crs.SetNextModule(next.module_address);
             }
         } else if (next.module_address) {
             // link previous and next
-            previous.SetNext(next.module_address);
-            next.SetPrevious(previous.module_address);
+            previous.SetNextModule(next.module_address);
+            next.SetPreviousModule(previous.module_address);
         } else {
             // removing tail
             // set previous as new tail
-            previous.SetNext(0);
+            previous.SetNextModule(0);
 
             // let head's previous point to the new tail
-            if (next_head.module_address && next_head.Previous() == module_address) {
-                next_head.SetPrevious(previous.module_address);
-            } else if (previous_head.module_address && previous_head.Previous() == module_address) {
-                previous_head.SetPrevious(previous.module_address);
+            if (next_head.module_address && next_head.PreviousModule() == module_address) {
+                next_head.SetPreviousModule(previous.module_address);
+            } else if (previous_head.module_address && previous_head.PreviousModule() == module_address) {
+                previous_head.SetPreviousModule(previous.module_address);
             } else {
                 UNREACHABLE();
             }
         }
 
         // unlink self
-        SetNext(0);
-        SetPrevious(0);
+        SetNextModule(0);
+        SetPreviousModule(0);
     }
 
     /**
@@ -2020,7 +2027,7 @@ public:
     }
 };
 
-std::array<int, 17> CROHelper::ENTRY_SIZE {{
+const std::array<int, 17> CROHelper::ENTRY_SIZE {{
     1, // code
     1, // data
     1, // module name
@@ -2040,7 +2047,7 @@ std::array<int, 17> CROHelper::ENTRY_SIZE {{
     sizeof(StaticPatchEntry)
 }};
 
-std::array<CROHelper::HeaderField, 4> CROHelper::FIX_BARRIERS {{
+const std::array<CROHelper::HeaderField, 4> CROHelper::FIX_BARRIERS {{
     Fix0Barrier,
     Fix1Barrier,
     Fix2Barrier,
