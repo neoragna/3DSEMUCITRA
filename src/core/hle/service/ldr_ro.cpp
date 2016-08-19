@@ -2054,14 +2054,28 @@ const std::array<CROHelper::HeaderField, 4> CROHelper::FIX_BARRIERS {{
     Fix3Barrier
 }};
 
-// This is a work-around before we implement memory aliasing.
-// CRS and CRO are mapped (aliased) to another memory when loading.
-// Games can read from both the original buffer or the mapped memory,
-// and even write to the original buffer after CRO loading.
-// So we use this to synchronize all original buffer with mapped memory
-// after modifiying the content (rebasing, linking, etc.).
+/**
+ * This is a work-around before we implement memory aliasing.
+ * CRS and CRO are mapped (aliased) to another memory when loading. Games can read
+ * from both the original buffer and the mapping memory. So we use this to synchronize
+ * all original buffers with mapping memory after modifying the content.
+ */
 class MemorySynchronizer {
-    std::map<VAddr, std::tuple<VAddr, u32>> memory_blocks;
+    struct MemoryBlock {
+        VAddr mapping;
+        VAddr original;
+        u32 size;
+    };
+
+    std::vector<MemoryBlock> memory_blocks;
+
+    auto FindMemoryBlock(VAddr mapping, VAddr original) {
+        auto block = std::find_if(memory_blocks.begin(), memory_blocks.end(), [=](MemoryBlock& b){
+            return b.original == original;
+        });
+        ASSERT(block->mapping == mapping);
+        return block;
+    }
 
 public:
     void Clear() {
@@ -2069,30 +2083,20 @@ public:
     }
 
     void AddMemoryBlock(VAddr mapping, VAddr original, u32 size) {
-        memory_blocks[mapping] = std::make_tuple(original, size);
+        memory_blocks.push_back(MemoryBlock{mapping, original, size});
     }
 
-    void RemoveMemoryBlock(VAddr source) {
-        memory_blocks.erase(source);
+    void ResizeMemoryBlock(VAddr mapping, VAddr original, u32 size) {
+        FindMemoryBlock(mapping, original)->size = size;
+    }
+
+    void RemoveMemoryBlock(VAddr mapping, VAddr original) {
+        memory_blocks.erase(FindMemoryBlock(mapping, original));
     }
 
     void SynchronizeOriginalMemory() {
-        for (auto block : memory_blocks) {
-            VAddr mapping = block.first;
-            VAddr original;
-            u32 size;
-            std::tie(original, size) = block.second;
-            Memory::CopyBlock(original, mapping, size);
-        }
-    }
-
-    void SynchronizeMappingMemory() {
-        for (auto block : memory_blocks) {
-            VAddr mapping = block.first;
-            VAddr original;
-            u32 size;
-            std::tie(original, size) = block.second;
-            Memory::CopyBlock(mapping, original, size);
+        for (auto& block : memory_blocks) {
+            Memory::CopyBlock(block.original, block.mapping, block.size);
         }
     }
 };
@@ -2354,8 +2358,6 @@ static void LoadCRO(Service::Interface* self, bool link_on_load_bug_fix) {
         return;
     }
 
-    memory_synchronizer.SynchronizeMappingMemory();
-
     cmd_buff[0] = IPC::MakeHeader(link_on_load_bug_fix ? 9 : 4, 2, 0);
 
     if (loaded_crs == 0) {
@@ -2483,7 +2485,7 @@ static void LoadCRO(Service::Interface* self, bool link_on_load_bug_fix) {
         }
 
         // Changes the block size
-        memory_synchronizer.AddMemoryBlock(cro_address, cro_buffer_ptr, fix_size);
+        memory_synchronizer.ResizeMemoryBlock(cro_address, cro_buffer_ptr, fix_size);
     }
 
     VAddr exe_begin;
@@ -2546,8 +2548,6 @@ static void UnloadCRO(Service::Interface* self) {
 
     CROHelper cro(cro_address);
 
-    memory_synchronizer.SynchronizeMappingMemory();
-
     cmd_buff[0] = IPC::MakeHeader(5, 1, 0);
 
     if (loaded_crs == 0) {
@@ -2602,7 +2602,7 @@ static void UnloadCRO(Service::Interface* self) {
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error unmapping CRO %08X", result.raw);
         }
-        memory_synchronizer.RemoveMemoryBlock(cro_address);
+        memory_synchronizer.RemoveMemoryBlock(cro_address, cro_buffer_ptr);
     }
 
     Core::g_app_core->ClearInstructionCache();
@@ -2638,8 +2638,6 @@ static void LinkCRO(Service::Interface* self) {
     }
 
     CROHelper cro(cro_address);
-
-    memory_synchronizer.SynchronizeMappingMemory();
 
     cmd_buff[0] = IPC::MakeHeader(6, 1, 0);
 
@@ -2703,8 +2701,6 @@ static void UnlinkCRO(Service::Interface* self) {
 
     CROHelper cro(cro_address);
 
-    memory_synchronizer.SynchronizeMappingMemory();
-
     cmd_buff[0] = IPC::MakeHeader(7, 1, 0);
 
     if (loaded_crs == 0) {
@@ -2765,8 +2761,6 @@ static void Shutdown(Service::Interface* self) {
         return;
     }
 
-    memory_synchronizer.SynchronizeMappingMemory();
-
     if (loaded_crs == 0) {
         LOG_ERROR(Service_LDR, "Not initialized");
         cmd_buff[1] = ERROR_NOT_INITIALIZED.raw;
@@ -2788,7 +2782,7 @@ static void Shutdown(Service::Interface* self) {
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error unmapping CRS %08X", result.raw);
         }
-        memory_synchronizer.RemoveMemoryBlock(loaded_crs);
+        memory_synchronizer.RemoveMemoryBlock(loaded_crs, crs_buffer_ptr);
     }
 
     loaded_crs = 0;
