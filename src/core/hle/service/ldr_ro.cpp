@@ -630,12 +630,15 @@ class CROHelper final {
     }
 
     /**
-     * Verifies a string matching a predicted size (i.e. terminated by 0) if it is not empty
-     * @param address the virtual address of the string
-     * @param size the size of the string, including the terminating 0
+     * Verifies a string or a string table matching a predicted size (i.e. terminated by 0)
+     * if it is not empty. There can be many other nulls in the string table because
+     * they are composed by many sub strings. This function is to check whether the
+     * whole string (table) is terminated properly, despite that it is not actually one string.
+     * @param address the virtual address of the string (table)
+     * @param size the size of the string (table), including the terminating 0
      * @returns ResultCode RESULT_SUCCESS if the size matches, otherwise error code.
      */
-    static ResultCode VerifyStringLength(VAddr address, u32 size) {
+    static ResultCode VerifyStringTableLength(VAddr address, u32 size) {
         if (size != 0) {
             if (Memory::Read8(address + size - 1) != 0)
                 return CROFormatError(0x0B);
@@ -1576,7 +1579,7 @@ public:
             return result;
         }
 
-        result = VerifyStringLength(GetField(ModuleNameOffset), GetField(ModuleNameSize));
+        result = VerifyStringTableLength(GetField(ModuleNameOffset), GetField(ModuleNameSize));
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error verifying module name %08X", result.raw);
             return result;
@@ -1606,7 +1609,7 @@ public:
             return result;
         }
 
-        result = VerifyStringLength(GetField(ExportStringsOffset), GetField(ExportStringsSize));
+        result = VerifyStringTableLength(GetField(ExportStringsOffset), GetField(ExportStringsSize));
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error verifying export strings %08X", result.raw);
             return result;
@@ -1642,7 +1645,7 @@ public:
             return result;
         }
 
-        result = VerifyStringLength(GetField(ImportStringsOffset), GetField(ImportStringsSize));
+        result = VerifyStringTableLength(GetField(ImportStringsOffset), GetField(ImportStringsSize));
         if (result.IsError()) {
             LOG_ERROR(Service_LDR, "Error verifying import strings %08X", result.raw);
             return result;
