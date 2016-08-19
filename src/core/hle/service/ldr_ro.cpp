@@ -2113,6 +2113,7 @@ static bool VerifyBufferState(VAddr buffer_ptr, u32 size) {
 /**
  * LDR_RO::Initialize service function
  *  Inputs:
+ *      0 : 0x000100C2
  *      1 : CRS buffer pointer
  *      2 : CRS Size
  *      3 : Process memory address where the CRS will be mapped
@@ -2233,6 +2234,7 @@ static void Initialize(Service::Interface* self) {
 /**
  * LDR_RO::LoadCRR service function
  *  Inputs:
+ *      0 : 0x00020082
  *      1 : CRR buffer pointer
  *      2 : CRR Size
  *      3 : handle translation descriptor (zero)
@@ -2266,6 +2268,7 @@ static void LoadCRR(Service::Interface* self) {
 /**
  * LDR_RO::UnloadCRR service function
  *  Inputs:
+ *      0 : 0x00030042
  *      1 : CRR buffer pointer
  *      2 : handle translation descriptor (zero)
  *      3 : KProcess handle
@@ -2297,6 +2300,7 @@ static void UnloadCRR(Service::Interface* self) {
 /**
  * LDR_RO::LoadCRO service function
  *  Inputs:
+ *      0 : 0x000402C2 (old) / 0x000902C2 (new)
  *      1 : CRO buffer pointer
  *      2 : memory address where the CRO will be mapped
  *      3 : CRO Size
@@ -2512,6 +2516,7 @@ static void LoadCRO(Service::Interface* self) {
 /**
  * LDR_RO::UnloadCRO service function
  *  Inputs:
+ *      0 : 0x000500C2
  *      1 : mapped CRO pointer
  *      2 : zero? (RO service doesn't care)
  *      3 : original CRO pointer
@@ -2608,6 +2613,7 @@ static void UnloadCRO(Service::Interface* self) {
 /**
  * LDR_RO::LinkCRO service function
  *  Inputs:
+ *      0 : 0x00060042
  *      1 : mapped CRO pointer
  *      2 : handle translation descriptor (zero)
  *      3 : KProcess handle
@@ -2671,6 +2677,7 @@ static void LinkCRO(Service::Interface* self) {
 /**
  * LDR_RO::UnlinkCRO service function
  *  Inputs:
+ *      0 : 0x00070042
  *      1 : mapped CRO pointer
  *      2 : handle translation descriptor (zero)
  *      3 : KProcess handle
@@ -2734,6 +2741,7 @@ static void UnlinkCRO(Service::Interface* self) {
 /**
  * LDR_RO::Shutdown service function
  *  Inputs:
+ *      0 : 0x00080042
  *      1 : original CRS buffer pointer
  *      2 : handle translation descriptor (zero)
  *      3 : KProcess handle
