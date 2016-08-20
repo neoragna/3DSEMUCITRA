@@ -706,7 +706,7 @@ static void CreateLegacySystemSaveData(Service::Interface* self) {
  * FS_User::InitializeWithSdkVersion service function.
  *  Inputs:
  *      1 : Used SDK Version
- *      2 : ProcessId Header (must be 0x20)
+ *      2 : ProcessId Header
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
  */
