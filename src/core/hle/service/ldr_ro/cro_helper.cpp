@@ -266,14 +266,6 @@ ResultCode CROHelper::RebaseHeader(u32 cro_size) {
     return RESULT_SUCCESS;
 }
 
-ResultCode CROHelper::VerifyStringTableLength(VAddr address, u32 size) {
-    if (size != 0) {
-        if (Memory::Read8(address + size - 1) != 0)
-            return CROFormatError(0x0B);
-    }
-    return RESULT_SUCCESS;
-}
-
 ResultVal<VAddr> CROHelper::RebaseSegmentTable(u32 cro_size,
     VAddr data_segment_address, u32 data_segment_size,
     VAddr bss_segment_address, u32 bss_segment_size) {
@@ -1057,6 +1049,23 @@ ResultCode CROHelper::ApplyExitRelocations(VAddr crs_address) {
                 return result;
             }
         }
+    }
+    return RESULT_SUCCESS;
+}
+
+/**
+ * Verifies a string or a string table matching a predicted size (i.e. terminated by 0)
+ * if it is not empty. There can be many other nulls in the string table because
+ * they are composed by many sub strings. This function is to check whether the
+ * whole string (table) is terminated properly, despite that it is not actually one string.
+ * @param address the virtual address of the string (table)
+ * @param size the size of the string (table), including the terminating 0
+ * @returns ResultCode RESULT_SUCCESS if the size matches, otherwise error code.
+ */
+static ResultCode VerifyStringTableLength(VAddr address, u32 size) {
+    if (size != 0) {
+        if (Memory::Read8(address + size - 1) != 0)
+            return CROFormatError(0x0B);
     }
     return RESULT_SUCCESS;
 }

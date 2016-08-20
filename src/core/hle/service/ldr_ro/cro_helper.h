@@ -512,17 +512,6 @@ private:
     ResultCode RebaseHeader(u32 cro_size);
 
     /**
-     * Verifies a string or a string table matching a predicted size (i.e. terminated by 0)
-     * if it is not empty. There can be many other nulls in the string table because
-     * they are composed by many sub strings. This function is to check whether the
-     * whole string (table) is terminated properly, despite that it is not actually one string.
-     * @param address the virtual address of the string (table)
-     * @param size the size of the string (table), including the terminating 0
-     * @returns ResultCode RESULT_SUCCESS if the size matches, otherwise error code.
-     */
-    static ResultCode VerifyStringTableLength(VAddr address, u32 size);
-
-    /**
      * Rebases offsets in segment table according to module address.
      * @param cro_size the size of the CRO file
      * @param data_segment_address the buffer address for .data segment
