@@ -62,6 +62,8 @@ RasterizerOpenGL::RasterizerOpenGL() : shader_dirty(true) {
         uniform_block_data.lut_dirty[index] = true;
     }
 
+    uniform_block_data.fog_lut_dirty = true;
+
     // Set vertex attributes
     glVertexAttribPointer(GLShader::ATTRIBUTE_POSITION, 4, GL_FLOAT, GL_FALSE, sizeof(HardwareVertex), (GLvoid*)offsetof(HardwareVertex, position));
     glEnableVertexAttribArray(GLShader::ATTRIBUTE_POSITION);
@@ -101,6 +103,18 @@ RasterizerOpenGL::RasterizerOpenGL() : shader_dirty(true) {
         glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
+
+    // Setup the LUT for the fog
+    {
+        fog_lut.Create();
+        state.fog_lut.texture_1d = fog_lut.handle;
+    }
+    state.Apply();
+
+    glActiveTexture(GL_TEXTURE9);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_R32UI, 128, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     // Sync fixed function OpenGL state
     SyncCullMode();
@@ -182,6 +196,14 @@ void RasterizerOpenGL::DrawTriangles() {
                (GLint)(rect.bottom + regs.viewport_corner.y * color_surface->res_scale_height),
                (GLsizei)(viewport_width * color_surface->res_scale_width), (GLsizei)(viewport_height * color_surface->res_scale_height));
 
+    if (uniform_block_data.data.framebuffer_scale[0] != color_surface->res_scale_width ||
+        uniform_block_data.data.framebuffer_scale[1] != color_surface->res_scale_height) {
+
+        uniform_block_data.data.framebuffer_scale[0] = color_surface->res_scale_width;
+        uniform_block_data.data.framebuffer_scale[1] = color_surface->res_scale_height;
+        uniform_block_data.dirty = true;
+    }
+
     // Sync and bind the texture surfaces
     const auto pica_textures = regs.GetTextures();
     for (unsigned texture_index = 0; texture_index < pica_textures.size(); ++texture_index) {
@@ -213,6 +235,12 @@ void RasterizerOpenGL::DrawTriangles() {
             SyncLightingLUT(index);
             uniform_block_data.lut_dirty[index] = false;
         }
+    }
+
+    // Sync the fog lut
+    if (uniform_block_data.fog_lut_dirty) {
+        SyncFogLUT();
+        uniform_block_data.fog_lut_dirty = false;
     }
 
     // Sync the uniform data
@@ -280,6 +308,21 @@ void RasterizerOpenGL::NotifyPicaRegisterChanged(u32 id) {
         SyncBlendColor();
         break;
 
+    // Fog state
+    case PICA_REG_INDEX(fog_color):
+        SyncFogColor();
+        break;
+    case PICA_REG_INDEX_WORKAROUND(fog_lut_data[0], 0xe8):
+    case PICA_REG_INDEX_WORKAROUND(fog_lut_data[1], 0xe9):
+    case PICA_REG_INDEX_WORKAROUND(fog_lut_data[2], 0xea):
+    case PICA_REG_INDEX_WORKAROUND(fog_lut_data[3], 0xeb):
+    case PICA_REG_INDEX_WORKAROUND(fog_lut_data[4], 0xec):
+    case PICA_REG_INDEX_WORKAROUND(fog_lut_data[5], 0xed):
+    case PICA_REG_INDEX_WORKAROUND(fog_lut_data[6], 0xee):
+    case PICA_REG_INDEX_WORKAROUND(fog_lut_data[7], 0xef):
+        uniform_block_data.fog_lut_dirty = true;
+        break;
+
     // Alpha test
     case PICA_REG_INDEX(output_merger.alpha_test):
         SyncAlphaTest();
@@ -318,6 +361,15 @@ void RasterizerOpenGL::NotifyPicaRegisterChanged(u32 id) {
         SyncColorWriteMask();
         break;
 
+    // Scissor test
+    case PICA_REG_INDEX(scissor_test.mode):
+        shader_dirty = true;
+        break;
+    case PICA_REG_INDEX(scissor_test.x1): // and y1
+    case PICA_REG_INDEX(scissor_test.x2): // and y2
+        SyncScissorTest();
+        break;
+
     // Logic op
     case PICA_REG_INDEX(output_merger.logic_op):
         SyncLogicOp();
@@ -329,6 +381,7 @@ void RasterizerOpenGL::NotifyPicaRegisterChanged(u32 id) {
         break;
 
     // TEV stages
+    // (This also syncs fog_mode and fog_flip which are part of tev_combiner_buffer_input)
     case PICA_REG_INDEX(tev_stage0.color_source1):
     case PICA_REG_INDEX(tev_stage0.color_modifier1):
     case PICA_REG_INDEX(tev_stage0.color_op):
@@ -378,6 +431,17 @@ void RasterizerOpenGL::NotifyPicaRegisterChanged(u32 id) {
     // TEV combiner buffer color
     case PICA_REG_INDEX(tev_combiner_buffer_color):
         SyncCombinerColor();
+        break;
+
+    // Fragment lighting switches
+    case PICA_REG_INDEX(lighting.disable):
+    case PICA_REG_INDEX(lighting.num_lights):
+    case PICA_REG_INDEX(lighting.config0):
+    case PICA_REG_INDEX(lighting.config1):
+    case PICA_REG_INDEX(lighting.abs_lut_input):
+    case PICA_REG_INDEX(lighting.lut_input):
+    case PICA_REG_INDEX(lighting.lut_scale):
+    case PICA_REG_INDEX(lighting.light_enable):
         break;
 
     // Fragment lighting specular 0 color
@@ -516,6 +580,70 @@ void RasterizerOpenGL::NotifyPicaRegisterChanged(u32 id) {
     case PICA_REG_INDEX_WORKAROUND(lighting.light[7].x, 0x144 + 7 * 0x10):
     case PICA_REG_INDEX_WORKAROUND(lighting.light[7].z, 0x145 + 7 * 0x10):
         SyncLightPosition(7);
+        break;
+
+    // Fragment lighting light source config
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[0].config, 0x149 + 0 * 0x10):
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[1].config, 0x149 + 1 * 0x10):
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[2].config, 0x149 + 2 * 0x10):
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[3].config, 0x149 + 3 * 0x10):
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[4].config, 0x149 + 4 * 0x10):
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[5].config, 0x149 + 5 * 0x10):
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[6].config, 0x149 + 6 * 0x10):
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[7].config, 0x149 + 7 * 0x10):
+        shader_dirty = true;
+        break;
+
+    // Fragment lighting distance attenuation bias
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[0].dist_atten_bias, 0x014A + 0 * 0x10):
+        SyncLightDistanceAttenuationBias(0);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[1].dist_atten_bias, 0x014A + 1 * 0x10):
+        SyncLightDistanceAttenuationBias(1);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[2].dist_atten_bias, 0x014A + 2 * 0x10):
+        SyncLightDistanceAttenuationBias(2);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[3].dist_atten_bias, 0x014A + 3 * 0x10):
+        SyncLightDistanceAttenuationBias(3);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[4].dist_atten_bias, 0x014A + 4 * 0x10):
+        SyncLightDistanceAttenuationBias(4);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[5].dist_atten_bias, 0x014A + 5 * 0x10):
+        SyncLightDistanceAttenuationBias(5);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[6].dist_atten_bias, 0x014A + 6 * 0x10):
+        SyncLightDistanceAttenuationBias(6);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[7].dist_atten_bias, 0x014A + 7 * 0x10):
+        SyncLightDistanceAttenuationBias(7);
+        break;
+
+    // Fragment lighting distance attenuation scale
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[0].dist_atten_scale, 0x014B + 0 * 0x10):
+        SyncLightDistanceAttenuationScale(0);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[1].dist_atten_scale, 0x014B + 1 * 0x10):
+        SyncLightDistanceAttenuationScale(1);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[2].dist_atten_scale, 0x014B + 2 * 0x10):
+        SyncLightDistanceAttenuationScale(2);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[3].dist_atten_scale, 0x014B + 3 * 0x10):
+        SyncLightDistanceAttenuationScale(3);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[4].dist_atten_scale, 0x014B + 4 * 0x10):
+        SyncLightDistanceAttenuationScale(4);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[5].dist_atten_scale, 0x014B + 5 * 0x10):
+        SyncLightDistanceAttenuationScale(5);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[6].dist_atten_scale, 0x014B + 6 * 0x10):
+        SyncLightDistanceAttenuationScale(6);
+        break;
+    case PICA_REG_INDEX_WORKAROUND(lighting.light[7].dist_atten_scale, 0x014B + 7 * 0x10):
+        SyncLightDistanceAttenuationScale(7);
         break;
 
     // Fragment lighting global ambient color (emission + ambient * ambient)
@@ -875,9 +1003,15 @@ void RasterizerOpenGL::SetShader() {
         uniform_lut = glGetUniformLocation(shader->shader.handle, "lut[5]");
         if (uniform_lut != -1) { glUniform1i(uniform_lut, 8); }
 
+        GLuint uniform_fog_lut = glGetUniformLocation(shader->shader.handle, "fog_lut");
+        if (uniform_fog_lut != -1) { glUniform1i(uniform_fog_lut, 9); }
+
         current_shader = shader_cache.emplace(config, std::move(shader)).first->second.get();
 
         unsigned int block_index = glGetUniformBlockIndex(current_shader->shader.handle, "shader_data");
+        GLint block_size;
+        glGetActiveUniformBlockiv(current_shader->shader.handle, block_index, GL_UNIFORM_BLOCK_DATA_SIZE, &block_size);
+        ASSERT_MSG(block_size == sizeof(UniformData), "Uniform block size did not match!");
         glUniformBlockBinding(current_shader->shader.handle, block_index, 0);
 
         // Update uniforms
@@ -885,6 +1019,7 @@ void RasterizerOpenGL::SetShader() {
         SyncDepthOffset();
         SyncAlphaTest();
         SyncCombinerColor();
+        SyncScissorTest();
         auto& tev_stages = Pica::g_state.regs.GetTevStages();
         for (int index = 0; index < tev_stages.size(); ++index)
             SyncTevConstColor(index, tev_stages[index]);
@@ -896,7 +1031,11 @@ void RasterizerOpenGL::SetShader() {
             SyncLightDiffuse(light_index);
             SyncLightAmbient(light_index);
             SyncLightPosition(light_index);
+            SyncLightDistanceAttenuationBias(light_index);
+            SyncLightDistanceAttenuationScale(light_index);
         }
+
+        SyncFogColor();
     }
 }
 
@@ -963,6 +1102,30 @@ void RasterizerOpenGL::SyncBlendColor() {
     state.blend.color.alpha = blend_color[3];
 }
 
+void RasterizerOpenGL::SyncFogColor() {
+    const auto& regs = Pica::g_state.regs;
+    uniform_block_data.data.fog_color = {
+      regs.fog_color.r.Value() / 255.0f,
+      regs.fog_color.g.Value() / 255.0f,
+      regs.fog_color.b.Value() / 255.0f
+    };
+    uniform_block_data.dirty = true;
+}
+
+void RasterizerOpenGL::SyncFogLUT() {
+    std::array<GLuint, 128> new_data;
+
+    std::transform(Pica::g_state.fog.lut.begin(), Pica::g_state.fog.lut.end(), new_data.begin(), [](const auto& entry) {
+        return entry.raw;
+    });
+
+    if (new_data != fog_lut_data) {
+        fog_lut_data = new_data;
+        glActiveTexture(GL_TEXTURE9);
+        glTexSubImage1D(GL_TEXTURE_1D, 0, 0, 128, GL_RED_INTEGER, GL_UNSIGNED_INT, fog_lut_data.data());
+    }
+}
+
 void RasterizerOpenGL::SyncAlphaTest() {
     const auto& regs = Pica::g_state.regs;
     if (regs.output_merger.alpha_test.ref != uniform_block_data.data.alphatest_ref) {
@@ -1019,6 +1182,22 @@ void RasterizerOpenGL::SyncDepthTest() {
                                regs.output_merger.depth_write_enable == 1;
     state.depth.test_func = regs.output_merger.depth_test_enable == 1 ?
                             PicaToGL::CompareFunc(regs.output_merger.depth_test_func) : GL_ALWAYS;
+}
+
+void RasterizerOpenGL::SyncScissorTest() {
+    const auto& regs = Pica::g_state.regs;
+
+    if (uniform_block_data.data.scissor_x1 != regs.scissor_test.x1 ||
+        uniform_block_data.data.scissor_y1 != regs.scissor_test.y1 ||
+        uniform_block_data.data.scissor_x2 != regs.scissor_test.x2 ||
+        uniform_block_data.data.scissor_y2 != regs.scissor_test.y2) {
+
+        uniform_block_data.data.scissor_x1 = regs.scissor_test.x1;
+        uniform_block_data.data.scissor_y1 = regs.scissor_test.y1;
+        uniform_block_data.data.scissor_x2 = regs.scissor_test.x2;
+        uniform_block_data.data.scissor_y2 = regs.scissor_test.y2;
+        uniform_block_data.dirty = true;
+    }
 }
 
 void RasterizerOpenGL::SyncCombinerColor() {
@@ -1102,6 +1281,24 @@ void RasterizerOpenGL::SyncLightPosition(int light_index) {
 
     if (position != uniform_block_data.data.light_src[light_index].position) {
         uniform_block_data.data.light_src[light_index].position = position;
+        uniform_block_data.dirty = true;
+    }
+}
+
+void RasterizerOpenGL::SyncLightDistanceAttenuationBias(int light_index) {
+    GLfloat dist_atten_bias = Pica::float20::FromRaw(Pica::g_state.regs.lighting.light[light_index].dist_atten_bias).ToFloat32();
+
+    if (dist_atten_bias != uniform_block_data.data.light_src[light_index].dist_atten_bias) {
+        uniform_block_data.data.light_src[light_index].dist_atten_bias = dist_atten_bias;
+        uniform_block_data.dirty = true;
+    }
+}
+
+void RasterizerOpenGL::SyncLightDistanceAttenuationScale(int light_index) {
+    GLfloat dist_atten_scale = Pica::float20::FromRaw(Pica::g_state.regs.lighting.light[light_index].dist_atten_scale).ToFloat32();
+
+    if (dist_atten_scale != uniform_block_data.data.light_src[light_index].dist_atten_scale) {
+        uniform_block_data.data.light_src[light_index].dist_atten_scale = dist_atten_scale;
         uniform_block_data.dirty = true;
     }
 }

@@ -125,12 +125,13 @@ bool ForeachDirectoryEntry(unsigned* num_entries_out, const std::string &directo
  * Scans the directory tree, storing the results.
  * @param directory the parent directory to start scanning from
  * @param parent_entry FSTEntry where the filesystem tree results will be stored.
+ * @param recursion Number of children directories to read before giving up.
  * @return the total number of files/directories found
  */
-unsigned ScanDirectoryTree(const std::string &directory, FSTEntry& parent_entry);
+unsigned ScanDirectoryTree(const std::string &directory, FSTEntry& parent_entry, unsigned int recursion = 0);
 
 // deletes the given directory and anything under it. Returns true on success.
-bool DeleteDirRecursively(const std::string &directory);
+bool DeleteDirRecursively(const std::string &directory, unsigned int recursion = 256);
 
 // Returns the current directory
 std::string GetCurrentDir();

@@ -58,6 +58,10 @@ namespace FS {
 const ResultCode ERR_INVALID_HANDLE(ErrorDescription::InvalidHandle, ErrorModule::FS,
         ErrorSummary::InvalidArgument, ErrorLevel::Permanent);
 
+/// Returned when a function is passed an invalid archive handle.
+const ResultCode ERR_INVALID_ARCHIVE_HANDLE(ErrorDescription::FS_ArchiveNotMounted, ErrorModule::FS,
+    ErrorSummary::NotFound, ErrorLevel::Status); // 0xC8804465
+
 // Command to access archive file
 enum class FileCommand : u32 {
     Dummy1          = 0x000100C6,
@@ -108,13 +112,14 @@ ResultVal<bool> File::SyncRequest() {
                           offset, length, backend->GetSize());
             }
 
-            ResultVal<size_t> read = backend->Read(offset, length, Memory::GetPointer(address));
+            std::vector<u8> data(length);
+            ResultVal<size_t> read = backend->Read(offset, data.size(), data.data());
             if (read.Failed()) {
                 cmd_buff[1] = read.Code().raw;
                 return read.Code();
             }
+            Memory::WriteBlock(address, data.data(), *read);
             cmd_buff[2] = static_cast<u32>(*read);
-            Memory::RasterizerFlushAndInvalidateRegion(Memory::VirtualToPhysicalAddress(address), length);
             break;
         }
 
@@ -128,7 +133,9 @@ ResultVal<bool> File::SyncRequest() {
             LOG_TRACE(Service_FS, "Write %s %s: offset=0x%llx length=%d address=0x%x, flush=0x%x",
                       GetTypeName().c_str(), GetName().c_str(), offset, length, address, flush);
 
-            ResultVal<size_t> written = backend->Write(offset, length, flush != 0, Memory::GetPointer(address));
+            std::vector<u8> data(length);
+            Memory::ReadBlock(address, data.data(), data.size());
+            ResultVal<size_t> written = backend->Write(offset, data.size(), flush != 0, data.data());
             if (written.Failed()) {
                 cmd_buff[1] = written.Code().raw;
                 return written.Code();
@@ -216,12 +223,14 @@ ResultVal<bool> Directory::SyncRequest() {
         {
             u32 count = cmd_buff[1];
             u32 address = cmd_buff[3];
-            auto entries = reinterpret_cast<FileSys::Entry*>(Memory::GetPointer(address));
+            std::vector<FileSys::Entry> entries(count);
             LOG_TRACE(Service_FS, "Read %s %s: count=%d",
                 GetTypeName().c_str(), GetName().c_str(), count);
 
             // Number of entries actually read
-            cmd_buff[2] = backend->Read(count, entries);
+            u32 read = backend->Read(entries.size(), entries.data());
+            cmd_buff[2] = read;
+            Memory::WriteBlock(address, entries.data(), read * sizeof(FileSys::Entry));
             break;
         }
 
@@ -250,7 +259,7 @@ using FileSys::ArchiveFactory;
 
 /**
  * Map of registered archives, identified by id code. Once an archive is registered here, it is
- * never removed until the FS service is shut down.
+ * never removed until UnregisterArchiveTypes is called.
  */
 static boost::container::flat_map<ArchiveIdCode, std::unique_ptr<ArchiveFactory>> id_code_map;
 
@@ -287,7 +296,7 @@ ResultVal<ArchiveHandle> OpenArchive(ArchiveIdCode id_code, FileSys::Path& archi
 
 ResultCode CloseArchive(ArchiveHandle handle) {
     if (handle_map.erase(handle) == 0)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
     else
         return RESULT_SUCCESS;
 }
@@ -309,7 +318,7 @@ ResultVal<Kernel::SharedPtr<File>> OpenFileFromArchive(ArchiveHandle archive_han
         const FileSys::Path& path, const FileSys::Mode mode) {
     ArchiveBackend* archive = GetArchive(archive_handle);
     if (archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
 
     auto backend = archive->OpenFile(path, mode);
     if (backend.Failed())
@@ -322,7 +331,7 @@ ResultVal<Kernel::SharedPtr<File>> OpenFileFromArchive(ArchiveHandle archive_han
 ResultCode DeleteFileFromArchive(ArchiveHandle archive_handle, const FileSys::Path& path) {
     ArchiveBackend* archive = GetArchive(archive_handle);
     if (archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
 
     return archive->DeleteFile(path);
 }
@@ -332,7 +341,7 @@ ResultCode RenameFileBetweenArchives(ArchiveHandle src_archive_handle, const Fil
     ArchiveBackend* src_archive = GetArchive(src_archive_handle);
     ArchiveBackend* dest_archive = GetArchive(dest_archive_handle);
     if (src_archive == nullptr || dest_archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
 
     if (src_archive == dest_archive) {
         if (src_archive->RenameFile(src_path, dest_path))
@@ -351,7 +360,7 @@ ResultCode RenameFileBetweenArchives(ArchiveHandle src_archive_handle, const Fil
 ResultCode DeleteDirectoryFromArchive(ArchiveHandle archive_handle, const FileSys::Path& path) {
     ArchiveBackend* archive = GetArchive(archive_handle);
     if (archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
 
     if (archive->DeleteDirectory(path))
         return RESULT_SUCCESS;
@@ -362,7 +371,7 @@ ResultCode DeleteDirectoryFromArchive(ArchiveHandle archive_handle, const FileSy
 ResultCode CreateFileInArchive(ArchiveHandle archive_handle, const FileSys::Path& path, u64 file_size) {
     ArchiveBackend* archive = GetArchive(archive_handle);
     if (archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
 
     return archive->CreateFile(path, file_size);
 }
@@ -370,7 +379,7 @@ ResultCode CreateFileInArchive(ArchiveHandle archive_handle, const FileSys::Path
 ResultCode CreateDirectoryFromArchive(ArchiveHandle archive_handle, const FileSys::Path& path) {
     ArchiveBackend* archive = GetArchive(archive_handle);
     if (archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
 
     if (archive->CreateDirectory(path))
         return RESULT_SUCCESS;
@@ -383,7 +392,7 @@ ResultCode RenameDirectoryBetweenArchives(ArchiveHandle src_archive_handle, cons
     ArchiveBackend* src_archive = GetArchive(src_archive_handle);
     ArchiveBackend* dest_archive = GetArchive(dest_archive_handle);
     if (src_archive == nullptr || dest_archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
 
     if (src_archive == dest_archive) {
         if (src_archive->RenameDirectory(src_path, dest_path))
@@ -403,7 +412,7 @@ ResultVal<Kernel::SharedPtr<Directory>> OpenDirectoryFromArchive(ArchiveHandle a
         const FileSys::Path& path) {
     ArchiveBackend* archive = GetArchive(archive_handle);
     if (archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
 
     std::unique_ptr<FileSys::DirectoryBackend> backend = archive->OpenDirectory(path);
     if (backend == nullptr) {
@@ -418,7 +427,7 @@ ResultVal<Kernel::SharedPtr<Directory>> OpenDirectoryFromArchive(ArchiveHandle a
 ResultVal<u64> GetFreeBytesInArchive(ArchiveHandle archive_handle) {
     ArchiveBackend* archive = GetArchive(archive_handle);
     if (archive == nullptr)
-        return ERR_INVALID_HANDLE;
+        return ERR_INVALID_ARCHIVE_HANDLE;
     return MakeResult<u64>(archive->GetFreeBytes());
 }
 
@@ -456,11 +465,12 @@ ResultCode CreateExtSaveData(MediaType media_type, u32 high, u32 low, VAddr icon
     if (result.IsError())
         return result;
 
-    u8* smdh_icon = Memory::GetPointer(icon_buffer);
-    if (!smdh_icon)
+    if (!Memory::IsValidVirtualAddress(icon_buffer))
         return ResultCode(-1); // TODO(Subv): Find the right error code
 
-    ext_savedata->WriteIcon(path, smdh_icon, icon_size);
+    std::vector<u8> smdh_icon(icon_size);
+    Memory::ReadBlock(icon_buffer, smdh_icon.data(), smdh_icon.size());
+    ext_savedata->WriteIcon(path, smdh_icon.data(), smdh_icon.size());
     return RESULT_SUCCESS;
 }
 
@@ -510,12 +520,7 @@ ResultCode CreateSystemSaveData(u32 high, u32 low) {
     return RESULT_SUCCESS;
 }
 
-/// Initialize archives
-void ArchiveInit() {
-    next_handle = 1;
-
-    AddService(new FS::Interface);
-
+void RegisterArchiveTypes() {
     // TODO(Subv): Add the other archive types (see here for the known types:
     // http://3dbrew.org/wiki/FS:OpenArchive#Archive_idcodes).
 
@@ -552,10 +557,23 @@ void ArchiveInit() {
     RegisterArchiveType(std::move(systemsavedata_factory), ArchiveIdCode::SystemSaveData);
 }
 
+void UnregisterArchiveTypes() {
+    id_code_map.clear();
+}
+
+/// Initialize archives
+void ArchiveInit() {
+    next_handle = 1;
+
+    AddService(new FS::Interface);
+
+    RegisterArchiveTypes();
+}
+
 /// Shutdown archives
 void ArchiveShutdown() {
     handle_map.clear();
-    id_code_map.clear();
+    UnregisterArchiveTypes();
 }
 
 } // namespace FS

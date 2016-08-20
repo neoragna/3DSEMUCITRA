@@ -115,7 +115,28 @@ struct Regs {
         BitField<24, 5, Semantic> map_w;
     } vs_output_attributes[7];
 
-    INSERT_PADDING_WORDS(0x11);
+    INSERT_PADDING_WORDS(0xe);
+
+    enum class ScissorMode : u32 {
+        Disabled = 0,
+        Exclude = 1, // Exclude pixels inside the scissor box
+
+        Include = 3 // Exclude pixels outside the scissor box
+    };
+
+    struct {
+        BitField<0, 2, ScissorMode> mode;
+
+        union {
+            BitField< 0, 16, u32> x1;
+            BitField<16, 16, u32> y1;
+        };
+
+        union {
+            BitField< 0, 16, u32> x2;
+            BitField<16, 16, u32> y2;
+        };
+    } scissor_test;
 
     union {
         BitField< 0, 10, s32> x;
@@ -401,22 +422,47 @@ struct Regs {
     TevStageConfig tev_stage3;
     INSERT_PADDING_WORDS(0x3);
 
+    enum class FogMode : u32 {
+        None = 0,
+        Fog  = 5,
+        Gas  = 7,
+    };
+
     union {
-        // Tev stages 0-3 write their output to the combiner buffer if the corresponding bit in
-        // these masks are set
-        BitField< 8, 4, u32> update_mask_rgb;
-        BitField<12, 4, u32> update_mask_a;
+        BitField<0, 3, FogMode> fog_mode;
+        BitField<16, 1, u32> fog_flip;
 
-        bool TevStageUpdatesCombinerBufferColor(unsigned stage_index) const {
-            return (stage_index < 4) && (update_mask_rgb & (1 << stage_index));
-        }
+        union {
+            // Tev stages 0-3 write their output to the combiner buffer if the corresponding bit in
+            // these masks are set
+            BitField< 8, 4, u32> update_mask_rgb;
+            BitField<12, 4, u32> update_mask_a;
 
-        bool TevStageUpdatesCombinerBufferAlpha(unsigned stage_index) const {
-            return (stage_index < 4) && (update_mask_a & (1 << stage_index));
-        }
-    } tev_combiner_buffer_input;
+            bool TevStageUpdatesCombinerBufferColor(unsigned stage_index) const {
+                return (stage_index < 4) && (update_mask_rgb & (1 << stage_index));
+            }
 
-    INSERT_PADDING_WORDS(0xf);
+            bool TevStageUpdatesCombinerBufferAlpha(unsigned stage_index) const {
+                return (stage_index < 4) && (update_mask_a & (1 << stage_index));
+            }
+        } tev_combiner_buffer_input;
+    };
+
+    union {
+        u32 raw;
+        BitField< 0, 8, u32> r;
+        BitField< 8, 8, u32> g;
+        BitField<16, 8, u32> b;
+    } fog_color;
+
+    INSERT_PADDING_WORDS(0x4);
+
+    BitField<0, 16, u32> fog_lut_offset;
+
+    INSERT_PADDING_WORDS(0x1);
+
+    u32 fog_lut_data[8];
+
     TevStageConfig tev_stage4;
     INSERT_PADDING_WORDS(0x3);
     TevStageConfig tev_stage5;
@@ -787,23 +833,21 @@ struct Regs {
             LightColor diffuse;     // material.diffuse * light.diffuse
             LightColor ambient;     // material.ambient * light.ambient
 
-            struct {
-                // Encoded as 16-bit floating point
-                union {
-                    BitField< 0, 16, u32> x;
-                    BitField<16, 16, u32> y;
-                };
-                union {
-                    BitField< 0, 16, u32> z;
-                };
-
-                INSERT_PADDING_WORDS(0x3);
-
-                union {
-                    BitField<0, 1, u32> directional;
-                    BitField<1, 1, u32> two_sided_diffuse; // When disabled, clamp dot-product to 0
-                };
+            // Encoded as 16-bit floating point
+            union {
+                BitField< 0, 16, u32> x;
+                BitField<16, 16, u32> y;
             };
+            union {
+                BitField< 0, 16, u32> z;
+            };
+
+            INSERT_PADDING_WORDS(0x3);
+
+            union {
+                BitField<0, 1, u32> directional;
+                BitField<1, 1, u32> two_sided_diffuse; // When disabled, clamp dot-product to 0
+            } config;
 
             BitField<0, 20, u32> dist_atten_bias;
             BitField<0, 20, u32> dist_atten_scale;
@@ -824,7 +868,7 @@ struct Regs {
             BitField<27, 1, u32> clamp_highlights;
             BitField<28, 2, LightingBumpMode> bump_mode;
             BitField<30, 1, u32> disable_bump_renorm;
-        };
+        } config0;
 
         union {
             BitField<16, 1, u32> disable_lut_d0;
@@ -845,13 +889,13 @@ struct Regs {
             BitField<29, 1, u32> disable_dist_atten_light_5;
             BitField<30, 1, u32> disable_dist_atten_light_6;
             BitField<31, 1, u32> disable_dist_atten_light_7;
-        };
+        } config1;
 
         bool IsDistAttenDisabled(unsigned index) const {
-            const unsigned disable[] = { disable_dist_atten_light_0, disable_dist_atten_light_1,
-                                         disable_dist_atten_light_2, disable_dist_atten_light_3,
-                                         disable_dist_atten_light_4, disable_dist_atten_light_5,
-                                         disable_dist_atten_light_6, disable_dist_atten_light_7 };
+            const unsigned disable[] = { config1.disable_dist_atten_light_0, config1.disable_dist_atten_light_1,
+                                         config1.disable_dist_atten_light_2, config1.disable_dist_atten_light_3,
+                                         config1.disable_dist_atten_light_4, config1.disable_dist_atten_light_5,
+                                         config1.disable_dist_atten_light_6, config1.disable_dist_atten_light_7 };
             return disable[index] != 0;
         }
 
@@ -1305,6 +1349,7 @@ ASSERT_REG_POSITION(viewport_depth_range, 0x4d);
 ASSERT_REG_POSITION(viewport_depth_near_plane, 0x4e);
 ASSERT_REG_POSITION(vs_output_attributes[0], 0x50);
 ASSERT_REG_POSITION(vs_output_attributes[1], 0x51);
+ASSERT_REG_POSITION(scissor_test, 0x65);
 ASSERT_REG_POSITION(viewport_corner, 0x68);
 ASSERT_REG_POSITION(depthmap_enable, 0x6D);
 ASSERT_REG_POSITION(texture0_enable, 0x80);
@@ -1320,6 +1365,10 @@ ASSERT_REG_POSITION(tev_stage1, 0xc8);
 ASSERT_REG_POSITION(tev_stage2, 0xd0);
 ASSERT_REG_POSITION(tev_stage3, 0xd8);
 ASSERT_REG_POSITION(tev_combiner_buffer_input, 0xe0);
+ASSERT_REG_POSITION(fog_mode, 0xe0);
+ASSERT_REG_POSITION(fog_color, 0xe1);
+ASSERT_REG_POSITION(fog_lut_offset, 0xe6);
+ASSERT_REG_POSITION(fog_lut_data, 0xe8);
 ASSERT_REG_POSITION(tev_stage4, 0xf0);
 ASSERT_REG_POSITION(tev_stage5, 0xf8);
 ASSERT_REG_POSITION(tev_combiner_buffer_color, 0xfd);

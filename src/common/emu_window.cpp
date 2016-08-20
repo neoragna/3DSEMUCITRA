@@ -11,12 +11,28 @@
 #include "emu_window.h"
 #include "video_core/video_core.h"
 
-void EmuWindow::KeyPressed(KeyMap::HostDeviceKey key) {
-    pad_state.hex |= KeyMap::GetPadKey(key).hex;
+void EmuWindow::ButtonPressed(Service::HID::PadState pad) {
+    pad_state.hex |= pad.hex;
 }
 
-void EmuWindow::KeyReleased(KeyMap::HostDeviceKey key) {
-    pad_state.hex &= ~KeyMap::GetPadKey(key).hex;
+void EmuWindow::ButtonReleased(Service::HID::PadState pad) {
+    pad_state.hex &= ~pad.hex;
+}
+
+void EmuWindow::CirclePadUpdated(float x, float y) {
+    constexpr int MAX_CIRCLEPAD_POS = 0x9C; // Max value for a circle pad position
+
+    // Make sure the coordinates are in the unit circle,
+    // otherwise normalize it.
+    float r = x * x + y * y;
+    if (r > 1) {
+        r = std::sqrt(r);
+        x /= r;
+        y /= r;
+    }
+
+    circle_pad_x = static_cast<s16>(x * MAX_CIRCLEPAD_POS);
+    circle_pad_y = static_cast<s16>(y * MAX_CIRCLEPAD_POS);
 }
 
 /**
@@ -35,7 +51,6 @@ static bool IsWithinTouchscreen(const EmuWindow::FramebufferLayout& layout, unsi
 }
 
 std::tuple<unsigned,unsigned> EmuWindow::ClipToTouchScreen(unsigned new_x, unsigned new_y) {
-
     new_x = std::max(new_x, framebuffer_layout.bottom_screen.left);
     new_x = std::min(new_x, framebuffer_layout.bottom_screen.right-1);
 
@@ -76,9 +91,9 @@ void EmuWindow::TouchMoved(unsigned framebuffer_x, unsigned framebuffer_y) {
 }
 
 EmuWindow::FramebufferLayout EmuWindow::FramebufferLayout::DefaultScreenLayout(unsigned width, unsigned height) {
-
-    ASSERT(width > 0);
-    ASSERT(height > 0);
+    // When hiding the widget, the function receives a size of 0
+    if (width == 0) width = 1;
+    if (height == 0) height = 1;
 
     EmuWindow::FramebufferLayout res = { width, height, {}, {} };
 

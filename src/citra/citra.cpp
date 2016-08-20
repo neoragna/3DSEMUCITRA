@@ -17,11 +17,16 @@
 #include <getopt.h>
 #endif
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include "common/logging/log.h"
 #include "common/logging/backend.h"
 #include "common/logging/filter.h"
 #include "common/scm_rev.h"
 #include "common/scope_exit.h"
+#include "common/string_util.h"
 
 #include "core/settings.h"
 #include "core/system.h"
@@ -55,6 +60,15 @@ int main(int argc, char **argv) {
     bool use_gdbstub = Settings::values.use_gdbstub;
     u32 gdb_port = static_cast<u32>(Settings::values.gdbstub_port);
     char *endarg;
+#ifdef _WIN32
+    int argc_w;
+    auto argv_w = CommandLineToArgvW(GetCommandLineW(), &argc_w);
+
+    if (argv_w == nullptr) {
+        LOG_CRITICAL(Frontend, "Failed to get command line arguments");
+        return -1;
+    }
+#endif
     std::string boot_filename;
 
     static struct option long_options[] = {
@@ -86,10 +100,18 @@ int main(int argc, char **argv) {
                 return 0;
             }
         } else {
+#ifdef _WIN32
+            boot_filename = Common::UTF16ToUTF8(argv_w[optind]);
+#else
             boot_filename = argv[optind];
+#endif
             optind++;
         }
     }
+
+#ifdef _WIN32
+    LocalFree(argv_w);
+#endif
 
     Log::Filter log_filter(Log::Level::Debug);
     Log::SetFilter(&log_filter);
@@ -114,7 +136,13 @@ int main(int argc, char **argv) {
     System::Init(emu_window.get());
     SCOPE_EXIT({ System::Shutdown(); });
 
-    Loader::ResultStatus load_result = Loader::LoadFile(boot_filename);
+    std::unique_ptr<Loader::AppLoader> loader = Loader::GetLoader(boot_filename);
+    if (!loader) {
+        LOG_CRITICAL(Frontend, "Failed to obtain loader for %s!", boot_filename.c_str());
+        return -1;
+    }
+
+    Loader::ResultStatus load_result = loader->Load();
     if (Loader::ResultStatus::Success != load_result) {
         LOG_CRITICAL(Frontend, "Failed to load ROM (Error %i)!", load_result);
         return -1;

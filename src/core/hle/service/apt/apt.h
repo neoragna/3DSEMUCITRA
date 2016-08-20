@@ -20,16 +20,14 @@ struct MessageParameter {
     u32 sender_id = 0;
     u32 destination_id = 0;
     u32 signal = 0;
-    u32 buffer_size = 0;
     Kernel::SharedPtr<Kernel::Object> object = nullptr;
-    u8* data = nullptr;
+    std::vector<u8> buffer;
 };
 
 /// Holds information about the parameters used in StartLibraryApplet
 struct AppletStartupParameter {
-    u32 buffer_size = 0;
     Kernel::SharedPtr<Kernel::Object> object = nullptr;
-    u8* data = nullptr;
+    std::vector<u8> buffer;
 };
 
 /// Used by the application to pass information about the current framebuffer to applets.
@@ -68,6 +66,8 @@ enum class AppletId : u32 {
     InstructionManual  = 0x115,
     Notifications      = 0x116,
     Miiverse           = 0x117,
+    MiiversePost       = 0x118,
+    AmiiboSettings     = 0x119,
     SoftwareKeyboard1  = 0x201,
     Ed1                = 0x202,
     PnoteApp           = 0x204,
@@ -80,12 +80,25 @@ enum class AppletId : u32 {
     AnyLibraryApplet   = 0x400,
     SoftwareKeyboard2  = 0x401,
     Ed2                = 0x402,
+    PnoteApp2          = 0x404,
+    SnoteApp2          = 0x405,
+    Error2             = 0x406,
+    Mint2              = 0x407,
+    Extrapad2          = 0x408,
+    Memolib2           = 0x409,
 };
 
 enum class StartupArgumentType : u32 {
     OtherApp   = 0,
     Restart    = 1,
     OtherMedia = 2,
+};
+
+enum class ScreencapPostPermission : u32 {
+    CleanThePermission                 = 0, //TODO(JamePeng): verify what "zero" means
+    NoExplicitSetting                  = 1,
+    EnableScreenshotPostingToMiiverse  = 2,
+    DisableScreenshotPostingToMiiverse = 3
 };
 
 /// Send a parameter to the currently-running application, which will read it via ReceiveParameter
@@ -377,25 +390,24 @@ void StartLibraryApplet(Service::Interface* self);
 void GetStartupArgument(Service::Interface* self);
 
 /**
- * APT::SetNSStateField service function
+ * APT::SetScreenCapPostPermission service function
  *  Inputs:
- *      1 : u8 NS state field
+ *      0 : Header Code[0x00550040]
+ *      1 : u8 The screenshot posting permission
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
- *  Note:
- *      This writes the input u8 to a NS state field.
  */
-void SetNSStateField(Service::Interface* self);
+void SetScreenCapPostPermission(Service::Interface* self);
 
 /**
- * APT::GetNSStateField service function
+ * APT::GetScreenCapPostPermission service function
+ *  Inputs:
+ *      0 : Header Code[0x00560000]
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
- *      8 : u8 NS state field
- *  Note:
- *      This returns a u8 NS state field(which can be set by cmd 0x00550040), at cmdreply+8.
+ *      2 : u8 The screenshot posting permission
  */
-void GetNSStateField(Service::Interface* self);
+void GetScreenCapPostPermission(Service::Interface* self);
 
 /**
  * APT::CheckNew3DSApp service function

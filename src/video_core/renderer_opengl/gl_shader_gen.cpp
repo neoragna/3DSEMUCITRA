@@ -439,9 +439,7 @@ static void WriteLighting(std::string& out, const PicaShaderConfig& config) {
         // If enabled, compute distance attenuation value
         std::string dist_atten = "1.0";
         if (light_config.dist_atten_enable) {
-            std::string scale = std::to_string(light_config.dist_atten_scale);
-            std::string bias = std::to_string(light_config.dist_atten_bias);
-            std::string index = "(" + scale + " * length(-view - " + light_src + ".position) + " + bias + ")";
+            std::string index = "(" + light_src + ".dist_atten_scale * length(-view - " + light_src + ".position) + " + light_src + ".dist_atten_bias)";
             index = "((clamp(" + index + ", 0.0, FLOAT_255)))";
             const unsigned lut_num = ((unsigned)Regs::LightingSampler::DistanceAttenuation + light_config.num);
             dist_atten = GetLutValue((Regs::LightingSampler)lut_num, index);
@@ -541,6 +539,8 @@ in float texcoord0_w;
 in vec4 normquat;
 in vec3 view;
 
+in vec4 gl_FragCoord;
+
 out vec4 color;
 
 struct LightSrc {
@@ -549,20 +549,29 @@ struct LightSrc {
     vec3 diffuse;
     vec3 ambient;
     vec3 position;
+    float dist_atten_bias;
+    float dist_atten_scale;
 };
 
 layout (std140) uniform shader_data {
-    vec4 const_color[NUM_TEV_STAGES];
-    vec4 tev_combiner_buffer_color;
+    vec2 framebuffer_scale;
     int alphatest_ref;
     float depth_scale;
     float depth_offset;
+    int scissor_x1;
+    int scissor_y1;
+    int scissor_x2;
+    int scissor_y2;
+    vec3 fog_color;
     vec3 lighting_global_ambient;
     LightSrc light_src[NUM_LIGHTS];
+    vec4 const_color[NUM_TEV_STAGES];
+    vec4 tev_combiner_buffer_color;
 };
 
 uniform sampler2D tex[3];
 uniform sampler1D lut[6];
+uniform usampler1D fog_lut;
 
 // Rotate the vector v by the quaternion q
 vec3 quaternion_rotate(vec4 q, vec3 v) {
@@ -578,6 +587,25 @@ vec4 secondary_fragment_color = vec4(0.0);
     if (state.alpha_test_func == Regs::CompareFunc::Never) {
         out += "discard; }";
         return out;
+    }
+
+    // Append the scissor test
+    if (state.scissor_test_mode != Regs::ScissorMode::Disabled) {
+        out += "if (";
+        // Negate the condition if we have to keep only the pixels outside the scissor box
+        if (state.scissor_test_mode == Regs::ScissorMode::Include)
+            out += "!";
+        // x2,y2 have +1 added to cover the entire pixel area
+        out += "(gl_FragCoord.x >= scissor_x1 * framebuffer_scale.x && "
+                "gl_FragCoord.y >= scissor_y1 * framebuffer_scale.y && "
+                "gl_FragCoord.x < (scissor_x2 + 1) * framebuffer_scale.x && "
+                "gl_FragCoord.y < (scissor_y2 + 1) * framebuffer_scale.y)) discard;\n";
+    }
+
+    out += "float z_over_w = 1.0 - gl_FragCoord.z * 2.0;\n";
+    out += "float depth = z_over_w * depth_scale + depth_offset;\n";
+    if (state.depthmap_enable == Pica::Regs::DepthBuffering::WBuffering) {
+        out += "depth /= gl_FragCoord.w;\n";
     }
 
     if (state.lighting.enable)
@@ -596,14 +624,30 @@ vec4 secondary_fragment_color = vec4(0.0);
         out += ") discard;\n";
     }
 
-    out += "color = last_tex_env_out;\n";
+    // Append fog combiner
+    if (state.fog_mode == Regs::FogMode::Fog) {
+        // Get index into fog LUT
+        if (state.fog_flip) {
+            out += "float fog_index = (1.0 - depth) * 128.0;\n";
+        } else {
+            out += "float fog_index = depth * 128.0;\n";
+        }
 
-    out += "float z_over_w = 1.0 - gl_FragCoord.z * 2.0;\n";
-    out += "float depth = z_over_w * depth_scale + depth_offset;\n";
-    if (state.depthmap_enable == Pica::Regs::DepthBuffering::WBuffering) {
-        out += "depth /= gl_FragCoord.w;\n";
+        // Generate clamped fog factor from LUT for given fog index
+        out += "float fog_i = clamp(floor(fog_index), 0.0, 127.0);\n";
+        out += "float fog_f = fog_index - fog_i;\n";
+        out += "uint fog_lut_entry = texelFetch(fog_lut, int(fog_i), 0).r;\n";
+        out += "float fog_lut_entry_difference = float(int((fog_lut_entry & 0x1FFFU) << 19U) >> 19);\n"; // Extract signed difference
+        out += "float fog_lut_entry_value = float((fog_lut_entry >> 13U) & 0x7FFU);\n";
+        out += "float fog_factor = (fog_lut_entry_value + fog_lut_entry_difference * fog_f) / 2047.0;\n";
+        out += "fog_factor = clamp(fog_factor, 0.0, 1.0);\n";
+
+        // Blend the fog
+        out += "last_tex_env_out.rgb = mix(fog_color.rgb, last_tex_env_out.rgb, fog_factor);\n";
     }
+
     out += "gl_FragDepth = depth;\n";
+    out += "color = last_tex_env_out;\n";
 
     out += "}";
 

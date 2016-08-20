@@ -338,11 +338,25 @@ static void ProcessTriangleInternal(const Shader::OutputVertex& v0,
             return;
     }
 
-    // TODO: Proper scissor rect test!
     u16 min_x = std::min({vtxpos[0].x, vtxpos[1].x, vtxpos[2].x});
     u16 min_y = std::min({vtxpos[0].y, vtxpos[1].y, vtxpos[2].y});
     u16 max_x = std::max({vtxpos[0].x, vtxpos[1].x, vtxpos[2].x});
     u16 max_y = std::max({vtxpos[0].y, vtxpos[1].y, vtxpos[2].y});
+
+    // Convert the scissor box coordinates to 12.4 fixed point
+    u16 scissor_x1 = (u16)( regs.scissor_test.x1      << 4);
+    u16 scissor_y1 = (u16)( regs.scissor_test.y1      << 4);
+    // x2,y2 have +1 added to cover the entire sub-pixel area
+    u16 scissor_x2 = (u16)((regs.scissor_test.x2 + 1) << 4);
+    u16 scissor_y2 = (u16)((regs.scissor_test.y2 + 1) << 4);
+
+    if (regs.scissor_test.mode == Regs::ScissorMode::Include) {
+        // Calculate the new bounds
+        min_x = std::max(min_x, scissor_x1);
+        min_y = std::max(min_y, scissor_y1);
+        max_x = std::min(max_x, scissor_x2);
+        max_y = std::min(max_y, scissor_y2);
+    }
 
     min_x &= Fix12P4::IntMask();
     min_y &= Fix12P4::IntMask();
@@ -383,6 +397,13 @@ static void ProcessTriangleInternal(const Shader::OutputVertex& v0,
     for (u16 y = min_y + 8; y < max_y; y += 0x10) {
         for (u16 x = min_x + 8; x < max_x; x += 0x10) {
 
+            // Do not process the pixel if it's inside the scissor box and the scissor mode is set to Exclude
+            if (regs.scissor_test.mode == Regs::ScissorMode::Exclude) {
+                if (x >= scissor_x1 && x < scissor_x2 &&
+                    y >= scissor_y1 && y < scissor_y2)
+                    continue;
+            }
+
             // Calculate the barycentric coordinates w0, w1 and w2
             int w0 = bias0 + SignedArea(vtxpos[1].xy(), vtxpos[2].xy(), {x, y});
             int w1 = bias1 + SignedArea(vtxpos[2].xy(), vtxpos[0].xy(), {x, y});
@@ -397,6 +418,26 @@ static void ProcessTriangleInternal(const Shader::OutputVertex& v0,
                                                 float24::FromFloat32(static_cast<float>(w1)),
                                                 float24::FromFloat32(static_cast<float>(w2)));
             float24 interpolated_w_inverse = float24::FromFloat32(1.0f) / Math::Dot(w_inverse, baricentric_coordinates);
+
+            // interpolated_z = z / w
+            float interpolated_z_over_w = (v0.screenpos[2].ToFloat32() * w0 +
+                                           v1.screenpos[2].ToFloat32() * w1 +
+                                           v2.screenpos[2].ToFloat32() * w2) / wsum;
+
+            // Not fully accurate. About 3 bits in precision are missing.
+            // Z-Buffer (z / w * scale + offset)
+            float depth_scale = float24::FromRaw(regs.viewport_depth_range).ToFloat32();
+            float depth_offset = float24::FromRaw(regs.viewport_depth_near_plane).ToFloat32();
+            float depth = interpolated_z_over_w * depth_scale + depth_offset;
+
+            // Potentially switch to W-Buffer
+            if (regs.depthmap_enable == Pica::Regs::DepthBuffering::WBuffering) {
+                // W-Buffer (z * scale + w * offset = (z / w * scale + offset) * w)
+                depth *= interpolated_w_inverse.ToFloat32() * wsum;
+            }
+
+            // Clamp the result
+            depth = MathUtil::Clamp(depth, 0.0f, 1.0f);
 
             // Perspective correct attribute interpolation:
             // Attribute values cannot be calculated by simple linear interpolation since
@@ -833,6 +874,38 @@ static void ProcessTriangleInternal(const Shader::OutputVertex& v0,
                     continue;
             }
 
+            // Apply fog combiner
+            // Not fully accurate. We'd have to know what data type is used to
+            // store the depth etc. Using float for now until we know more
+            // about Pica datatypes
+            if (regs.fog_mode == Regs::FogMode::Fog) {
+                const Math::Vec3<u8> fog_color = {
+                    static_cast<u8>(regs.fog_color.r.Value()),
+                    static_cast<u8>(regs.fog_color.g.Value()),
+                    static_cast<u8>(regs.fog_color.b.Value()),
+                };
+
+                // Get index into fog LUT
+                float fog_index;
+                if (g_state.regs.fog_flip) {
+                    fog_index = (1.0f - depth) * 128.0f;
+                } else {
+                    fog_index = depth * 128.0f;
+                }
+
+                // Generate clamped fog factor from LUT for given fog index
+                float fog_i = MathUtil::Clamp(floorf(fog_index), 0.0f, 127.0f);
+                float fog_f = fog_index - fog_i;
+                const auto& fog_lut_entry = g_state.fog.lut[static_cast<unsigned int>(fog_i)];
+                float fog_factor = (fog_lut_entry.value + fog_lut_entry.difference * fog_f) / 2047.0f; // This is signed fixed point 1.11
+                fog_factor = MathUtil::Clamp(fog_factor, 0.0f, 1.0f);
+
+                // Blend the fog
+                for (unsigned i = 0; i < 3; i++) {
+                    combiner_output[i] = fog_factor * combiner_output[i] + (1.0f - fog_factor) * fog_color[i];
+                }
+            }
+
             u8 old_stencil = 0;
 
             auto UpdateStencil = [stencil_test, x, y, &old_stencil](Pica::Regs::StencilAction action) {
@@ -886,27 +959,6 @@ static void ProcessTriangleInternal(const Shader::OutputVertex& v0,
                     continue;
                 }
             }
-
-            // interpolated_z = z / w
-            float interpolated_z_over_w = (v0.screenpos[2].ToFloat32() * w0 +
-                                           v1.screenpos[2].ToFloat32() * w1 +
-                                           v2.screenpos[2].ToFloat32() * w2) / wsum;
-
-            // Not fully accurate. About 3 bits in precision are missing.
-            // Z-Buffer (z / w * scale + offset)
-            float depth_scale = float24::FromRaw(regs.viewport_depth_range).ToFloat32();
-            float depth_offset = float24::FromRaw(regs.viewport_depth_near_plane).ToFloat32();
-            float depth = interpolated_z_over_w * depth_scale + depth_offset;
-
-            // Potentially switch to W-Buffer
-            if (regs.depthmap_enable == Pica::Regs::DepthBuffering::WBuffering) {
-
-                // W-Buffer (z * scale + w * offset = (z / w * scale + offset) * w)
-                depth *= interpolated_w_inverse.ToFloat32() * wsum;
-            }
-
-            // Clamp the result
-            depth = MathUtil::Clamp(depth, 0.0f, 1.0f);
 
             // Convert float to integer
             unsigned num_bits = Regs::DepthBitsPerPixel(regs.framebuffer.depth_format);
