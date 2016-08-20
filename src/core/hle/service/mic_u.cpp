@@ -21,9 +21,10 @@ namespace MIC_U {
 static void SetClientVersion(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
 
-    self->SetVersion(cmd_buff[1]);
+    const u32 version = cmd_buff[1];
+    self->SetVersion(version);
 
-    LOG_WARNING(Service_MIC, "(STUBBED) called, version: 0x%08X", cmd_buff[1]);
+    LOG_WARNING(Service_MIC, "(STUBBED) called, version: 0x%08X", version);
 
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
 }
