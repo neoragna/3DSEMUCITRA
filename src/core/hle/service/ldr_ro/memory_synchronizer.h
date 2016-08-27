@@ -24,9 +24,7 @@ public:
     void Clear();
 
     void AddMemoryBlock(VAddr mapping, VAddr original, u32 size);
-
     void ResizeMemoryBlock(VAddr mapping, VAddr original, u32 size);
-
     void RemoveMemoryBlock(VAddr mapping, VAddr original);
 
     void SynchronizeOriginalMemory();

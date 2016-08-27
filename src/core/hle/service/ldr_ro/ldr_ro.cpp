@@ -198,7 +198,6 @@ static void LoadCRR(Service::Interface* self) {
     }
 
     cmd_buff[0] = IPC::MakeHeader(2, 1, 0);
-
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
 
     LOG_WARNING(Service_LDR, "(STUBBED) called, crr_buffer_ptr=0x%08X, crr_size=0x%08X, descriptor=0x%08X, process=0x%08X",
@@ -230,7 +229,6 @@ static void UnloadCRR(Service::Interface* self) {
     }
 
     cmd_buff[0] = IPC::MakeHeader(3, 1, 0);
-
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
 
     LOG_WARNING(Service_LDR, "(STUBBED) called, crr_buffer_ptr=0x%08X, descriptor=0x%08X, process=0x%08X",
