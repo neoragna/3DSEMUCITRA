@@ -40,6 +40,8 @@ option(CITRA_USE_BUNDLED_SDL2 "Download bundled SDL2 binaries" OFF)
 option(ENABLE_QT "Enable the Qt frontend" ON)
 option(CITRA_USE_BUNDLED_QT "Download bundled Qt binaries" OFF)
 
+option(WIN_CREATE_INSTALLER "Create a windows installer with Squirrel" OFF)
+
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git/hooks/pre-commit)
     message(STATUS "Copying pre-commit hook")
     file(COPY hooks/pre-commit
@@ -76,7 +78,7 @@ else()
 
     # set up output paths for executable binaries (.exe-files, and .dll-files on DLL-capable platforms)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-    set(CMAKE_CONFIGURATION_TYPES Debug Release CACHE STRING "" FORCE)
+    set(CMAKE_CONFIGURATION_TYPES Debug Release RelWithDebInfo CACHE STRING "" FORCE)
 
     # Tweak optimization settings
     # As far as I can tell, there's no way to override the CMake defaults while leaving user
@@ -85,14 +87,13 @@ else()
 
     # /W3 - Level 3 warnings
     # /MP - Multi-threaded compilation
-    # /Zi - Output debugging information
-    # /Zo - enahnced debug info for optimized builds
-    set(CMAKE_C_FLAGS   "/W3 /MP /Zi /Zo" CACHE STRING "" FORCE)
+    set(CMAKE_C_FLAGS   "/W3 /MP" CACHE STRING "" FORCE)
     # /EHsc - C++-only exception handling semantics
     set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} /EHsc" CACHE STRING "" FORCE)
 
+    # /Zi - Output debugging information
     # /MDd - Multi-threaded Debug Runtime DLL
-    set(CMAKE_C_FLAGS_DEBUG   "/Od /MDd" CACHE STRING "" FORCE)
+    set(CMAKE_C_FLAGS_DEBUG   "/Zi /Od /MDd" CACHE STRING "" FORCE)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}" CACHE STRING "" FORCE)
 
     # /O2 - Optimization level 2
@@ -101,8 +102,38 @@ else()
     set(CMAKE_C_FLAGS_RELEASE   "/O2 /GS- /MD" CACHE STRING "" FORCE)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}" CACHE STRING "" FORCE)
 
+    # /Zo - enahnced debug info for optimized builds
+    set(CMAKE_C_FLAGS_RELWITHDEBINFO   "/Zo ${CMAKE_C_FLAGS_RELEASE}" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}" CACHE STRING "" FORCE)
+
     set(CMAKE_EXE_LINKER_FLAGS_DEBUG   "/DEBUG" CACHE STRING "" FORCE)
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/DEBUG /INCREMENTAL:NO /OPT:REF,ICF" CACHE STRING "" FORCE)
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/INCREMENTAL:NO /OPT:REF,ICF" CACHE STRING "" FORCE)
+    set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "/DEBUG ${CMAKE_EXE_LINKER_FLAGS_RELEASE}" CACHE STRING "" FORCE)
+endif()
+
+if (WIN_CREATE_INSTALLER)
+    # download NuGet 3.4.4 commandline to install squirrel with
+    if (NOT EXISTS "${CMAKE_BINARY_DIR}/nuget")
+        message(STATUS "Downloading binaries for nuget...")
+        file(DOWNLOAD https://dist.nuget.org/win-x86-commandline/v3.4.4/NuGet.exe
+            "${CMAKE_BINARY_DIR}/nuget/nuget.exe" SHOW_PROGRESS)
+    endif()
+    # download squirrel as well
+    if (NOT EXISTS "${CMAKE_BINARY_DIR}/squirrel")
+        message(STATUS "Downloading binaries for nuget...")
+        file(DOWNLOAD https://github.com/Squirrel/Squirrel.Windows/releases/download/1.4.4/Squirrel.Windows-1.4.4.zip
+            "${CMAKE_BINARY_DIR}/squirrel/squirrel.zip" SHOW_PROGRESS)
+        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xf "${CMAKE_BINARY_DIR}/squirrel/squirrel.zip"
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/squirrel")
+    endif()
+    # fill in the necessary details into the nuspec file template
+    configure_file(${CMAKE_SOURCE_DIR}/citra.nuspec ${CMAKE_BINARY_DIR}/citra.nuspec)
+    # make the path we'll copy the output to post build
+    set(SQUIRREL_DIR ${CMAKE_BINARY_DIR}/squirrel.win)
+    set(SQUIRREL_RELEASE_DIR ${SQUIRREL_DIR}/Release)
+    set(SQUIRREL_BUILD_DIR ${SQUIRREL_DIR}/Build)
+    set(SQUIRREL_BIN_DIR ${SQUIRREL_BUILD_DIR}/lib/net45)
+    file(MAKE_DIRECTORY ${SQUIRREL_BIN_DIR})
 endif()
 
 add_definitions(-DSINGLETHREADED)

@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>Citra</id>
+    <version>0.1.0</version>
+    <authors>Citra Development Team</authors>
+    <title>Citra 3DS Emulator</title>
+    <description>Citra 3DS Emulator for Windows</description>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <releaseNotes>None</releaseNotes>
+    <copyright>Copyright 2016</copyright>
+  </metadata>
+</package>
