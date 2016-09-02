@@ -111,10 +111,6 @@ if (Qt5_FOUND AND MSVC)
     set(DLL_DEST "${CMAKE_BINARY_DIR}/bin/$<CONFIG>/")
     set(PLATFORMS ${DLL_DEST}platforms/)
 
-    # copy the msvc redistributable dlls to the folder
-    set(MSVC_REDIST_DIR "C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/redist/x64/Microsoft.VC140.CRT")
-    windows_copy_files(citra-qt ${MSVC_REDIST_DIR} ${DLL_DEST} *.dll)
-
     windows_copy_files(citra-qt ${Qt5_DLL_DIR} ${DLL_DEST}
         icudt*.dll
         icuin*.dll
@@ -130,22 +126,4 @@ if (Qt5_FOUND AND MSVC)
     unset(Qt5_PLATFORMS_DIR)
     unset(DLL_DEST)
     unset(PLATFORMS)
-    unset(MSVC_REDIST_DIR)
-endif()
-
-if (WIN_CREATE_INSTALLER)
-    set(DLL_DEST "${CMAKE_BINARY_DIR}/bin/$<CONFIG>/")
-    # Copy the files to the folder for nuget to package
-    add_custom_command(TARGET citra-qt
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${DLL_DEST} ${SQUIRREL_BIN_DIR}
-        POST_BUILD
-    )
-    # build the nuget file
-    add_custom_command(TARGET citra-qt POST_BUILD
-        COMMAND ${CMAKE_BINARY_DIR}/nuget/nuget.exe pack ${CMAKE_BINARY_DIR}/citra.nuspec -BasePath ${SQUIRREL_BUILD_DIR} -OutputDirectory ${SQUIRREL_BUILD_DIR}
-    )
-    add_custom_command(TARGET citra-qt POST_BUILD
-        COMMAND ${CMAKE_BINARY_DIR}/squirrel/squirrel.exe --releasify ${SQUIRREL_BUILD_DIR}/Citra.0.1.0.nupkg --releaseDir=${SQUIRREL_RELEASE_DIR} --icon=${CMAKE_SOURCE_DIR}/dist/citra.ico --loadingGif=${CMAKE_SOURCE_DIR}/dist/output.gif
-    )
-    unset(DLL_DEST)
 endif()

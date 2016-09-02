@@ -36,6 +36,34 @@ on_success:
           {
             $GITDATE = $(git show -s --date=short --format='%ad') -replace "-",""
             $GITREV = $(git show -s --format='%h')
+
+            # Build the installer
+            $CMAKE_SOURCE_DIR = "$env:APPVEYOR_BUILD_FOLDER"
+            $CMAKE_SOURCE_DIR = "C:/dev/citra"
+            $CMAKE_BINARY_DIR = "$CMAKE_SOURCE_DIR/build"
+            $BIN_FOLDER = "$CMAKE_BINARY_DIR/bin/Release"
+            $SQUIRREL_DIR = "$CMAKE_BINARY_DIR/squirrel.win"
+            $SQUIRREL_RELEASE_DIR = "$SQUIRREL_DIR/Release"
+            $SQUIRREL_BUILD_DIR = "$SQUIRREL_DIR/Build"
+            $SQUIRREL_BIN_DIR = "$SQUIRREL_DIR/lib/net45"
+            # make the path we'll copy the output to post build
+            New-Item -ItemType Directory -Force -Path $SQUIRREL_BIN_DIR
+
+            # Copy the files to the folder for nuget to package
+            echo $BIN_FOLDER
+            echo $SQUIRREL_BIN_DIR
+            Copy-Item -path "$BIN_FOLDER/*" -exclude "*.pdb" -destination $SQUIRREL_BIN_DIR
+
+            # build the nuget file
+            cmd /c "$CMAKE_BINARY_DIR/nuget/nuget.exe pack $CMAKE_BINARY_DIR/citra.nuspec ^
+                    -BasePath $SQUIRREL_BUILD_DIR -OutputDirectory $SQUIRREL_BUILD_DIR"
+            echo "Building squirrel"
+            cmd /c "$CMAKE_BINARY_DIR/squirrel/squirrel.exe --releasify $SQUIRREL_BUILD_DIR/Citra.0.1.0.nupkg ^
+                    --releaseDir=$SQUIRREL_RELEASE_DIR --icon=$CMAKE_SOURCE_DIR/dist/citra.ico ^
+                    --loadingGif=$CMAKE_SOURCE_DIR/dist/output.gif"
+
+            $GITDATE = $(git show -s --date=short --format='%ad') -replace "-",""
+            $GITREV = $(git show -s --format='%h')
             # Where are these spaces coming from? Regardless, let's remove them
             $BUILD_NAME = "citra-${GITDATE}-${GITREV}-windows-amd64.7z" -replace " ",""
             $BUILD_NAME_NOQT = "citra-noqt-${GITDATE}-${GITREV}-windows-amd64.7z" -replace " ",""
