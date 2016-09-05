@@ -44,6 +44,7 @@ after_build:
         rm .\build\bin\release\*.pdb
 
         # Build the installer
+        $APPVEYOR_BUILD_NUMBER = "$env:APPVEYOR_BUILD_NUMBER"
         $CMAKE_SOURCE_DIR = "$env:APPVEYOR_BUILD_FOLDER"
         $CMAKE_BINARY_DIR = "$CMAKE_SOURCE_DIR/build"
         $BIN_FOLDER = "$CMAKE_BINARY_DIR/bin/Release"
