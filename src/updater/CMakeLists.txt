@@ -1,6 +1,6 @@
 if (WIN_CREATE_INSTALLER)
     # fill in the necessary details into the nuspec file template
-    set(VERSION_BUILD_NUMBER 12)
+    set(VERSION_BUILD_NUMBER $ENV{APPVEYOR_BUILD_NUMBER})
     configure_file(${CMAKE_SOURCE_DIR}/citra.nuspec ${CMAKE_BINARY_DIR}/citra.nuspec)
     # set the source files to work with
     set (SRCS
