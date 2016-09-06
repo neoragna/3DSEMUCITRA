@@ -3,8 +3,12 @@ if (WIN_CREATE_INSTALLER)
     # fill in the necessary details into the nuspec file template
     set(VERSION_BUILD_NUMBER $ENV{APPVEYOR_BUILD_NUMBER})
     configure_file(${CMAKE_SOURCE_DIR}/citra.nuspec ${CMAKE_BINARY_DIR}/citra.nuspec)
+    # Generate cpp with most recent tag info
+    set(TAG_NAME "lemon-${VERSION_BUILD_NUMBER}")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/tagname.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/tagname.cpp" @ONLY)
     # set the source files to work with
     set (SRCS
+        tagname.cpp
         updater.cpp
         updater.rc
         updater.manifest
@@ -13,6 +17,7 @@ if (WIN_CREATE_INSTALLER)
     )
     set (HEADERS
         getopt.h
+        tagname.h
     )
 
     add_executable(updater ${SRCS} ${HEADERS})
