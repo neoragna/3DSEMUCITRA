@@ -4,6 +4,9 @@
 [submodule "boost"]
 	path = externals/boost
 	url = https://github.com/citra-emu/ext-boost.git
+[submodule "externals/cpr"]
+    path = externals/cpr
+    url = https://github.com/whoshuu/cpr
 [submodule "nihstro"]
 	path = externals/nihstro
 	url = https://github.com/neobrain/nihstro.git
@@ -13,6 +16,3 @@
 [submodule "catch"]
 	path = externals/catch
 	url = https://github.com/philsquared/Catch.git
-[submodule "externals/cpr"]
-    path = externals/cpr
-    url = https://github.com/whoshuu/cpr
