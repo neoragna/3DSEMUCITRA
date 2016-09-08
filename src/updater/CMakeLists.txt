@@ -4,7 +4,7 @@ if (WIN_CREATE_INSTALLER)
     set(VERSION_BUILD_NUMBER $ENV{APPVEYOR_BUILD_NUMBER})
     configure_file(${CMAKE_SOURCE_DIR}/citra.nuspec ${CMAKE_BINARY_DIR}/citra.nuspec)
     # Generate cpp with most recent tag info
-    set(TAG_NAME "lemon-${VERSION_BUILD_NUMBER}")
+    set(TAG_NAME "nightly-unstable-${VERSION_BUILD_NUMBER}")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/tagname.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/tagname.cpp" @ONLY)
     # set the source files to work with
     set (SRCS
@@ -26,8 +26,10 @@ if (WIN_CREATE_INSTALLER)
     target_compile_options(cpr BEFORE PRIVATE "/MT")
     target_compile_definitions(updater PUBLIC STATIC_GETOPT)
     target_include_directories(updater INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-    set_target_properties(updater PROPERTIES LINK_FLAGS "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
-    target_link_libraries(updater ${CPR_LIBRARIES})
+    set_target_properties(updater PROPERTIES LINK_FLAGS "/SUBSYSTEM:windows /ENTRY:mainCRTStartup \
+        /manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+        processorArchitecture='amd64' publicKeyToken='6595b64144ccf1df' language='*'\"")
+    target_link_libraries(updater ${CPR_LIBRARIES} comctl32)
     if (ENABLE_QT)
         add_dependencies(updater citra-qt)
     endif()

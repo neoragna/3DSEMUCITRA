@@ -4,7 +4,7 @@
 
 #include "updater/tagname.h"
 
-#define TAG_NAME      "lemon-"
+#define TAG_NAME      "nightly-unstable-"
 
 namespace Updater {
 
