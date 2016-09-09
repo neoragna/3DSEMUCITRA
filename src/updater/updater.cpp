@@ -35,12 +35,12 @@ void startProcessWrapper(std::string name, std::string args, boolean wait) {
 }
 
 void displayWelcome() {
-    MessageBoxA(NULL, "You are currently running the Citra Nightly Unstable branch.\n"
+    MessageBoxA(NULL, "You are currently running the Citra Bleeding Edge branch.\n"
             "This is a build of Citra with additional changes that have not yet been fully tested or deemed stable."
             "As such, please do not report bugs against this build.\n\n"
-            "If you believe you've found a bug, please reattempt on our nightly stable builds.\n\n"
-            "Citra Nightly Unstable will alert you when a new build is released.",
-        "Citra Nightly Unstable", MB_OK | MB_ICONINFORMATION);
+            "If you believe you've found a bug, please reattempt on our nightly builds.\n\n"
+            "Citra will alert you when a new build is released.",
+        "Citra Bleeding Edge", MB_OK | MB_ICONINFORMATION);
 }
 
 void installMSVCRuntime(const char* msvc_redist_exe) {
@@ -197,7 +197,7 @@ int main(int argc, char** argv) {
     }
     // check for updates in the background
     // fetch the latest tag number from github
-    auto r = cpr::Get(cpr::Url{"https://api.github.com/repos/citrabot/citra-bleeding-edge/releases/latest"});
+    auto r = cpr::Get(cpr::Url{"https://api.github.com/repos/citra/citra-bleeding-edge/releases/latest"});
     if (r.status_code == 200) {
         // fetch the tag name from the json
         std::smatch match;
@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
                 TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
                 int selection;
                 //BOOL checkbox;
-                std::wstring mbox_title = L"Citra Bleeding Edge";
+                std::wstring mbox_title = L"Citra - Bleeding Edge";
                 std::wstring mbox_header = L"An update to Citra is available";
                 std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
                 std::wstring mbox_extra_info = converter.from_bytes("Current version: " + std::string(Updater::tag_name) + "\nLatest version: " + tag_name);
@@ -234,7 +234,7 @@ int main(int argc, char** argv) {
                 if (selection == 1000) {
                     // download the latest version and get it ready
                     // TODO display some updater dialog... maybe the loading gif
-                    startProcessWrapper(updater_exe, "Update.exe --update=https://github.com/citrabot/citra-bleeding-edge/releases/download/" + tag_name, true);
+                    startProcessWrapper(updater_exe, "Update.exe --update=https://github.com/citra/citra-bleeding-edge/releases/download/" + tag_name, true);
                     // and we are done! Next boot it'll point to the new version.
                     return 0;
                 }
