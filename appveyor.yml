@@ -97,17 +97,17 @@ after_build:
         # build the nuget file
         cmd /c "$CMAKE_BINARY_DIR/nuget/nuget.exe pack $CMAKE_BINARY_DIR/citra.nuspec -BasePath $SQUIRREL_BUILD_DIR -OutputDirectory $SQUIRREL_BUILD_DIR"
         echo "Building squirrel"
-        cmd /c "$CMAKE_BINARY_DIR/squirrel/squirrel.exe --releasify $SQUIRREL_BUILD_DIR/Citra.0.1.$APPVEYOR_BUILD_NUMBER.nupkg --releaseDir=$SQUIRREL_RELEASE_DIR --icon=$CMAKE_SOURCE_DIR/dist/citra.ico"
+        cmd /c "$CMAKE_BINARY_DIR/squirrel/squirrel.exe --releasify $SQUIRREL_BUILD_DIR/citra.edge.0.1.$APPVEYOR_BUILD_NUMBER.nupkg --releaseDir=$SQUIRREL_RELEASE_DIR --icon=$CMAKE_SOURCE_DIR/dist/citra.ico"
 
         # copy the files to the root dir so it'll be easier to make them artifacts
-        Copy-Item -path "$SQUIRREL_RELEASE_DIR/Citra*.nupkg" -recurse -force -destination $CMAKE_SOURCE_DIR
+        Copy-Item -path "$SQUIRREL_RELEASE_DIR/citra*.nupkg" -recurse -force -destination $CMAKE_SOURCE_DIR
         Copy-Item -path "$SQUIRREL_RELEASE_DIR/RELEASES" -recurse -force -destination $CMAKE_SOURCE_DIR
         Copy-Item -path "$SQUIRREL_RELEASE_DIR/Setup.exe" -recurse -force -destination $CMAKE_SOURCE_DIR
 
 artifacts:
-  - path: Citra-0.1.$(APPVEYOR_BUILD_NUMBER)-full.nupkg
+  - path: citra.edge-0.1.$(APPVEYOR_BUILD_NUMBER)-full.nupkg
     name: FullPkg
-  - path: Citra-0.1.$(APPVEYOR_BUILD_NUMBER)-delta.nupkg
+  - path: citra.edge-0.1.$(APPVEYOR_BUILD_NUMBER)-delta.nupkg
     name: DeltaPkg
   - path: Setup.exe
     name: Installer

@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
                 int selection;
                 //BOOL checkbox;
                 std::wstring mbox_title = L"Citra - Bleeding Edge";
-                std::wstring mbox_header = L"An update to Citra is available";
+                std::wstring mbox_header = L"An update to Citra - Bleeding Edge is available";
                 std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
                 std::wstring mbox_extra_info = converter.from_bytes("Current version: " + std::string(Updater::tag_name) + "\nLatest version: " + tag_name);
                 // TODO: save this to a settings file like updater.ini

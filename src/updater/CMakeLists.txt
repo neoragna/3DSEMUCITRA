@@ -4,7 +4,7 @@ if (WIN_CREATE_INSTALLER)
     set(VERSION_BUILD_NUMBER $ENV{APPVEYOR_BUILD_NUMBER})
     configure_file(${CMAKE_SOURCE_DIR}/citra.nuspec ${CMAKE_BINARY_DIR}/citra.nuspec)
     # Generate cpp with most recent tag info
-    set(TAG_NAME "nightly-unstable-${VERSION_BUILD_NUMBER}")
+    set(TAG_NAME "bleeding-edge-${VERSION_BUILD_NUMBER}")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/tagname.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/tagname.cpp" @ONLY)
     # set the source files to work with
     set (SRCS
