@@ -55,6 +55,10 @@
 
 #include "video_core/video_core.h"
 
+#ifdef QT_STATICPLUGIN
+Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin);
+#endif
+
 GMainWindow::GMainWindow() : config(new Config()), emu_thread(nullptr)
 {
     Pica::g_debug_context = Pica::DebugContext::Construct();
@@ -243,7 +247,9 @@ bool GMainWindow::InitializeSystem() {
     if (emu_thread != nullptr)
         ShutdownGame();
 
+    render_window->InitRenderTarget();
     render_window->MakeCurrent();
+
     if (!gladLoadGL()) {
         QMessageBox::critical(this, tr("Error while starting Citra!"),
                               tr("Failed to initialize the video core!\n\n"

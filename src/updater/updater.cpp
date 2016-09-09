@@ -9,7 +9,7 @@
 
 // Have to include getopt in the compilation unit or else its compiled with the wrong runtime
 #include <cpr/cpr.h>
-#include "getopt.h"
+#include <getopt.h>
 #include "tagname.h"
 
 void startProcessWrapper(std::string name, std::string args, boolean wait) {
@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
             case 'i':
                 // On install. Do what is needed and exit fast.
                 // TODO install msvc as part of the msi installer and leave it outta builds
-                installMSVCRuntime(msvc_redist_exe.c_str());
+                // installMSVCRuntime(msvc_redist_exe.c_str());
                 startProcessWrapper(updater_exe, "Update.exe --createShortcut=updater.exe", true);
                 return 0;
             case 'o':
