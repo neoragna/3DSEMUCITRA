@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <package>
   <metadata>
-    <id>Citra Edge</id>
+    <id>citra.edge</id>
     <version>0.1.${VERSION_BUILD_NUMBER}</version>
     <authors>Citra Development Team</authors>
-    <title>Citra 3DS Emulator</title>
+    <title>Citra Edge</title>
     <description>Citra 3DS Emulator for Windows - Bleeding Edge builds</description>
     <!-- Squirrel doesn't seem to do anything with this... -->
     <requireLicenseAcceptance>true</requireLicenseAcceptance>

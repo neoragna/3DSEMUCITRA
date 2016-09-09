@@ -23,12 +23,12 @@ VS_VERSION_INFO VERSIONINFO
         BLOCK "040904b0" // en-us unicode
         {
             VALUE "CompanyName",      "Citra Development Team"
-            VALUE "FileDescription",  "Citra 3ds Emulator"
+            VALUE "FileDescription",  "Citra 3ds Emulator - Bleeding Edge"
             VALUE "FileVersion",      "0.1.0"
             VALUE "InternalName",     "updater.exe"
             VALUE "LegalCopyright",   "GPL v2+"
             VALUE "OriginalFilename", "updater.exe"
-            VALUE "ProductName",      "Citra"
+            VALUE "ProductName",      "Citra Edge"
             VALUE "ProductVersion",   "0.1.0"
             VALUE "SquirrelAwareVersion", "1"
         }
