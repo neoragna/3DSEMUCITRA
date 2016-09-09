@@ -4,11 +4,11 @@ clone_depth: 5
 skip_tags: true
 
 deploy:
-  release: nightly-unstable-$(appveyor_build_number)
+  release: bleeding-edge-$(appveyor_build_number)
   description: |
-    Built by Lemon - The Citra Nightly unstable build bot. Build number $(appveyor_build_number)
+    Build number $(appveyor_build_number)
 
-    If you are unsure what to download, [download and run the latest Setup.exe](https://github.com/citra-emu/citra-bleeding-edge/releases/download/nightly-unstable-$(appveyor_build_number)/Setup.exe)
+    If you are unsure what to download, [download and run the latest Setup.exe](https://github.com/citra-emu/citra-bleeding-edge/releases/download/bleeding-edge-$(appveyor_build_number)/Setup.exe)
   provider: GitHub
   auth_token:
     secure: MeBSKRVxvUlkHpCbV+PhpGMmvM2Xh4gkjf4/gWvCtl1ix/VJQPbs7L/PNU7IS66C
