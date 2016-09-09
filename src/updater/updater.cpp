@@ -35,12 +35,12 @@ void startProcessWrapper(std::string name, std::string args, boolean wait) {
 }
 
 void displayWelcome() {
-    MessageBoxA(NULL, "You are currently running the Citra Bleeding Edge branch.\n"
+    MessageBoxA(NULL, "You are currently running on the channel: Bleeding Edge.\n"
             "This is a build of Citra with additional changes that have not yet been fully tested or deemed stable."
-            "As such, please do not report bugs against this build.\n\n"
-            "If you believe you've found a bug, please reattempt on our nightly builds.\n\n"
-            "Citra will alert you when a new build is released.",
-        "Citra Bleeding Edge", MB_OK | MB_ICONINFORMATION);
+            "Please do not report bugs against this build.\n\n"
+            "If you believe you've found a bug, please retest on our nightly builds.\n\n"
+            "Citra will automatically prompt you to update if one is available.",
+        "Citra", MB_OK | MB_ICONINFORMATION);
 }
 
 void installMSVCRuntime(const char* msvc_redist_exe) {
@@ -212,8 +212,8 @@ int main(int argc, char** argv) {
                 TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
                 int selection;
                 //BOOL checkbox;
-                std::wstring mbox_title = L"Citra - Bleeding Edge";
-                std::wstring mbox_header = L"An update to Citra - Bleeding Edge is available";
+                std::wstring mbox_title = L"Citra";
+                std::wstring mbox_header = L"An update to Citra is available!";
                 std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
                 std::wstring mbox_extra_info = converter.from_bytes("Current version: " + std::string(Updater::tag_name) + "\nLatest version: " + tag_name);
                 // TODO: save this to a settings file like updater.ini
