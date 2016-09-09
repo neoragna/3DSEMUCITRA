@@ -18,6 +18,7 @@ deploy:
   prerelease: false
 
 environment:
+
   BUILD_PASSWORD:
     secure: EXGNlWKJsCtbeImEJ5EP9qrxZ+EqUFfNy+CP61nDOMA=
 
@@ -80,11 +81,11 @@ after_build:
         New-Item -ItemType Directory -Force -Path $SQUIRREL_RELEASE_DIR | Out-Null
 
         # Download the previous release information to generate a delta build
-        $LATEST_RELEASE_URL = "https://api.github.com/repos/jroweboy/lemon/releases/latest"
+        $LATEST_RELEASE_URL = "https://api.github.com/repos/citrabot/citra-bleeding-edge/releases/latest"
         $LATEST_RELEASE_JSON = Invoke-WebRequest $LATEST_RELEASE_URL -Headers @{"Accept"="application/json"}
         $LATEST_RELEASE_JSON.Content -match '.*"tag_name":\s*"([^"]*)".*' | Out-Null
         $LATEST_RELEASE_TAG = $Matches[1]
-        $RELEASE_URL = "https://github.com/jroweboy/lemon/releases/download/$LATEST_RELEASE_TAG"
+        $RELEASE_URL = "https://github.com/citrabot/citra-bleeding-edge/releases/download/$LATEST_RELEASE_TAG"
         $PREVIOUS_RELEASE_NUMBER = ($LATEST_RELEASE_TAG -split "-")[1]
         (New-Object Net.WebClient).DownloadFile("$RELEASE_URL/RELEASES", "$SQUIRREL_RELEASE_DIR/RELEASES")
         (New-Object Net.WebClient).DownloadFile("$RELEASE_URL/Citra-0.1.$PREVIOUS_RELEASE_NUMBER-full.nupkg", "$SQUIRREL_RELEASE_DIR/Citra-0.1.$PREVIOUS_RELEASE_NUMBER-full.nupkg")

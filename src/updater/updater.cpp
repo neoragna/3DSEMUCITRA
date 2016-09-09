@@ -115,10 +115,6 @@ void copyPreviousInstallsUserFolder(std::string path) {
                         }
                     }
                 }
-                if (fname.substr(0, 3) == "Rel") {
-                    app_folder_paths[0] = path.substr(0, path.find_last_of("\\/")) + "\\" + fname;
-                    ++index;
-                }
             }
         } while (index < 2 && FindNextFile(h, &found_file));
         FindClose(h);
@@ -201,7 +197,7 @@ int main(int argc, char** argv) {
     }
     // check for updates in the background
     // fetch the latest tag number from github
-    auto r = cpr::Get(cpr::Url{"https://api.github.com/repos/jroweboy/lemon/releases/latest"});
+    auto r = cpr::Get(cpr::Url{"https://api.github.com/repos/citrabot/citra-bleeding-edge/releases/latest"});
     if (r.status_code == 200) {
         // fetch the tag name from the json
         std::smatch match;
@@ -238,7 +234,7 @@ int main(int argc, char** argv) {
                 if (selection == 1000) {
                     // download the latest version and get it ready
                     // TODO display some updater dialog... maybe the loading gif
-                    startProcessWrapper(updater_exe, "Update.exe --update=https://github.com/citra-emu/citra-bleeding-edge/releases/download/" + tag_name, true);
+                    startProcessWrapper(updater_exe, "Update.exe --update=https://github.com/citrabot/citra-bleeding-edge/releases/download/" + tag_name, true);
                     // and we are done! Next boot it'll point to the new version.
                     return 0;
                 }
