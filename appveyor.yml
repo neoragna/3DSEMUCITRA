@@ -8,7 +8,7 @@ deploy:
   description: |
     Build number $(appveyor_build_number)
 
-    If you are unsure what to download, [download and run the latest Setup.exe](https://github.com/citra-emu/citra-bleeding-edge/releases/download/bleeding-edge-$(appveyor_build_number)/Setup.exe)
+    If you are unsure what to download, [download and run the latest CitraSetup.exe](https://github.com/citra-emu/citra-bleeding-edge/releases/download/bleeding-edge-$(appveyor_build_number)/CitraSetup.exe)
   provider: GitHub
   auth_token:
     secure: 5iwe1T0xdmGxtJi8YIOfdUZvKNoriR5cqhfXN8QQ4J5Uj9syL6GeUNjgATkMzfCq
@@ -103,13 +103,14 @@ after_build:
         Copy-Item -path "$SQUIRREL_RELEASE_DIR/citra*.nupkg" -recurse -force -destination $CMAKE_SOURCE_DIR
         Copy-Item -path "$SQUIRREL_RELEASE_DIR/RELEASES" -recurse -force -destination $CMAKE_SOURCE_DIR
         Copy-Item -path "$SQUIRREL_RELEASE_DIR/Setup.exe" -recurse -force -destination $CMAKE_SOURCE_DIR
+        Rename-Item -path "$CMAKE_SOURCE_DIR/Setup.exe" CitraSetup.exe
 
 artifacts:
   - path: citra.edge-0.1.$(APPVEYOR_BUILD_NUMBER)-full.nupkg
     name: FullPkg
   - path: citra.edge-0.1.$(APPVEYOR_BUILD_NUMBER)-delta.nupkg
     name: DeltaPkg
-  - path: Setup.exe
+  - path: CitraSetup.exe
     name: Installer
   - path: RELEASES
     name: RELEASES
