@@ -170,6 +170,7 @@ int main(int argc, char** argv) {
             switch (arg) {
             case 'f':
                 // First time run. Just launch.
+                displayWelcome();
                 startProcessWrapper(updater_exe, "Update.exe --processStart=citra-qt.exe", false);
                 return 0;
             case 'i':
