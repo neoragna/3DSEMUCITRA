@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
             case 'u':
                 // Update: Find the old user directory and copy it over
                 copyPreviousInstallsUserFolder(path);
-                // squirrel seems to start the app so just return
+                startProcessWrapper(updater_exe, "Update.exe --processStart=citra-qt.exe", false);
                 return 0;
             case 'r':
                 // This throws an error when everything is somehow gone when it tries to remove the shortcut...
