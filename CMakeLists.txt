@@ -245,6 +245,10 @@ if (MSVC)
     add_subdirectory(externals/getopt)
 endif()
 
+if (WIN_CREATE_INSTALLER)
+    add_subdirectory(externals/getopt)
+endif()
+
 # process subdirectories
 if(ENABLE_QT)
     include_directories(externals/qhexedit)
