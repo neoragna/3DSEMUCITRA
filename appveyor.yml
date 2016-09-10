@@ -42,7 +42,7 @@ install:
         if ($env:BUILD_TYPE -eq 'mingw') {
           # redirect err to null to prevent warnings from becoming errors
           # workaround for cyclical dependancies
-          C:\msys64\usr\bin\bash -lc "pacman --noconfirm -Syu" 2> $null
+          #C:\msys64\usr\bin\bash -lc "pacman --noconfirm -Syu" 2> $null
           C:\msys64\usr\bin\bash -lc "pacman --noconfirm -S mingw64/mingw-w64-x86_64-freetype mingw64/mingw-w64-x86_64-fontconfig" 2> $null
           C:\msys64\usr\bin\bash -lc "pacman --noconfirm -S mingw64/mingw-w64-x86_64-cmake mingw64/mingw-w64-x86_64-qt5 mingw64/mingw-w64-x86_64-SDL2" 2> $null
         }
