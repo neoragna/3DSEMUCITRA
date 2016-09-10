@@ -130,7 +130,8 @@ after_build:
           # build the nuget file
           Start-Process -FilePath "$CMAKE_BINARY_DIR/nuget/nuget.exe" -ArgumentList "pack", "$CMAKE_BINARY_DIR/citra.nuspec", "-BasePath", "$SQUIRREL_BUILD_DIR", "-OutputDirectory", "$SQUIRREL_BUILD_DIR" | Wait-Process
           echo "Building squirrel"
-          Start-Process -FilePath $CMAKE_BINARY_DIR/squirrel/squirrel.exe -ArgumentList "--releasify", "$SQUIRREL_BUILD_DIR/citra.edge.0.1.$APPVEYOR_BUILD_NUMBER.nupkg", "--releaseDir=$SQUIRREL_RELEASE_DIR", "--icon=$CMAKE_SOURCE_DIR/dist/citra.ico" | Wait-Process
+          $arguments = "--releasify=$SQUIRREL_BUILD_DIR/citra.edge.0.1.$APPVEYOR_BUILD_NUMBER.nupkg", "--releaseDir=$SQUIRREL_RELEASE_DIR", "--icon=$CMAKE_SOURCE_DIR/dist/citra.ico"
+          Start-Process -FilePath $CMAKE_BINARY_DIR/squirrel/squirrel.exe -ArgumentList $arguments | Wait-Process
           # copy the files to the root dir so it'll be easier to make them artifacts
           Copy-Item -path "$SQUIRREL_RELEASE_DIR/citra*.nupkg" -recurse -force -destination $CMAKE_SOURCE_DIR
           Copy-Item -path "$SQUIRREL_RELEASE_DIR/RELEASES" -recurse -force -destination $CMAKE_SOURCE_DIR
