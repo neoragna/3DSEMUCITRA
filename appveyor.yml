@@ -59,6 +59,11 @@ before_build:
           # make sure error output from this command isn't interpreted as an error in powershell
           C:\Windows\System32\cmd /c 'C:\msys64\mingw64\bin\cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DQt5_DIR=C:/msys64/mingw64/qt5/lib/cmake/Qt5/ -DSDL2_INCLUDE_DIR=C:/msys64/mingw64/include/SDL2/ -DSDL2_LIBRARY=C:/msys64/mingw64/bin/SDL2.dll -DWIN_CREATE_INSTALLER=1 .. 2>&1'
           $env:Path = $old_path
+
+          # Xx 420 YOLO SWAG BLAZE IT xX
+          # current installed mingw version doesn't have TaskDialogIndirect in it.... so grab a newer version of the .a file
+          (New-Object Net.WebClient).DownloadFile("https://github.com/jroweboy/ext-windows-bin/raw/master/libcomctl32.a",
+            "C:/msys64/mingw64/x86_64-w64-mingw32/lib/libcomctl32.a")
         }
   - cd ..
 
@@ -125,8 +130,8 @@ after_build:
           foreach ($file in $MingwDLLs) {
             Copy-Item -path "C:/msys64/mingw64/bin/$file" -force -destination "$SQUIRREL_BIN_DIR"
           }
-          New-Item -ItemType Directory -Force -Path "$SQUIRREL_BIN_DIR/plugins/platforms" | Out-Null
-          Copy-Item -path "C:/msys64/mingw64/share/qt5/plugins/platforms/qwindows.dll" -force -destination "$SQUIRREL_BIN_DIR/plugins/platforms"
+          New-Item -ItemType Directory -Force -Path "$SQUIRREL_BIN_DIR/platforms" | Out-Null
+          Copy-Item -path "C:/msys64/mingw64/share/qt5/plugins/platforms/qwindows.dll" -force -destination "$SQUIRREL_BIN_DIR/platforms"
 
           # build the nuget file
           $arguments = "pack", "$CMAKE_BINARY_DIR/citra.nuspec", "-BasePath", "$SQUIRREL_BUILD_DIR", "-OutputDirectory", "$SQUIRREL_BUILD_DIR"
