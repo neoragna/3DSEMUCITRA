@@ -4,9 +4,13 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <cstdarg>
 #include <cstddef>
+#include <functional>
 #include <iomanip>
+#include <locale>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -135,4 +139,11 @@ bool ComparePartialString(InIt begin, InIt end, const char* other) {
  */
 std::string StringFromFixedZeroTerminatedBuffer(const char* buffer, size_t max_len);
 
+std::string LTrim(std::string &s);
+
+std::string RTrim(std::string &s);
+
+std::string Trim(std::string &s);
+
+std::string Join(const std::vector<std::string>& elements, const char* const separator);
 }
