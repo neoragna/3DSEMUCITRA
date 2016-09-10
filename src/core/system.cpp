@@ -30,7 +30,6 @@ Result Init(EmuWindow* emu_window) {
         return Result::ErrorInitVideoCore;
     }
     AudioCore::Init();
-    InputCore::Init();
     CheatCore::Init();
     GDBStub::Init();
 
@@ -46,7 +45,6 @@ bool IsPoweredOn() {
 void Shutdown() {
     GDBStub::Shutdown();
     CheatCore::Shutdown();
-    InputCore::Shutdown();
     AudioCore::Shutdown();
     VideoCore::Shutdown();
     HLE::Shutdown();
