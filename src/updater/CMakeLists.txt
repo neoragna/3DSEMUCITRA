@@ -20,6 +20,9 @@ if (WIN_CREATE_INSTALLER)
         # need to compile getopt as part of this app since the getopt target uses an incompatible runtime dll (/MD)
         LIST(APPEND SRCS getopt.c)
         LIST(APPEND HEADERS getopt.h)
+    else()
+        # mingw on appveyor doesn't support task dialog...
+        add_definitions(-DNO_TASKDIALOG=1)
     endif()
 
     add_executable(updater ${SRCS} ${HEADERS})
@@ -32,8 +35,6 @@ if (WIN_CREATE_INSTALLER)
            /manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
            processorArchitecture='amd64' publicKeyToken='6595b64144ccf1df' language='*'\"")
     else()
-        # mingw on appveyor doesn't support task dialog...
-        # target_compile_options(updater BEFORE PRIVATE "-DDISABLE_TASK_DIALOG")
         set_target_properties(updater PROPERTIES LINK_FLAGS "-Wl,--subsystem,windows")
         target_link_libraries(updater getopt)
     endif()

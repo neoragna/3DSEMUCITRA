@@ -172,7 +172,7 @@ std::string fetchLatestTag() {
     std::smatch match;
     std::regex tag_regex(".*\"tag_name\":\\s*\"([^\"]*)\".*");
     if (std::regex_search(output, match, tag_regex)) {
-        std::string tag_name = match[1];
+        tag_name = match[1];
     }
     return tag_name;
 }
@@ -243,6 +243,14 @@ int main(int argc, char** argv) {
         // if the version is the same, just start citra
         if (tag_name != "" && tag_name != Updater::tag_name) {
             // Bring up the update dialog
+#ifdef NO_TASKDIALOG
+            // Mingw64 on windows on appveyor doesn't support TASKDIALOG grr
+            int retval = MessageBoxW(NULL, L"An update is available. Would you like to update now?", L"Citra", MB_ICONEXCLAMATION | MB_YESNO);
+            if (retval == IDYES) {
+                startProcessWrapper(updater_exe, "Update.exe --update=https://github.com/citra-emu/citra-bleeding-edge/releases/download/" + tag_name, true);
+                return 0;
+            }
+#else
             HRESULT hr;
             TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
             int selection;
@@ -274,6 +282,7 @@ int main(int argc, char** argv) {
                 // and we are done! Next boot it'll point to the new version.
                 return 0;
             }
+#endif
         }
     }
     // Normal Run so just start citra-qt
