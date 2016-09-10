@@ -4,12 +4,14 @@
 #include <string>
 #include <iostream>
 #include <regex>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
+#include <wininet.h>
 #include <commctrl.h>
 
 // Have to include getopt in the compilation unit or else its compiled with the wrong runtime
-#include <cpr/cpr.h>
-#include <getopt.h>
+#include "getopt.h"
 #include "tagname.h"
 
 void startProcessWrapper(std::string name, std::string args, boolean wait) {
@@ -125,6 +127,7 @@ void copyPreviousInstallsUserFolder(std::string path) {
     ftyp = GetFileAttributesA(user_folder_old.c_str());
     if (ftyp != INVALID_FILE_ATTRIBUTES && (ftyp & FILE_ATTRIBUTE_DIRECTORY)) {
         // copy the old user directory over. Yes. SHFileOperation requires double null terminated strings
+        // TODO: Remove SHFileOperation and change it to IFileOperation
         const char* copy_from = std::string(user_folder_old + "\\*").c_str() + '\0';
         const char* copy_to = user_folder_new.c_str() + '\0';
         s.hwnd = nullptr;
@@ -135,6 +138,43 @@ void copyPreviousInstallsUserFolder(std::string path) {
         SHFileOperation(&s);
     }
     // if the old folder doesn't have a user directory, just ignore it.
+}
+
+bool checkInternetConnection() {
+    // Poor man's internet connection testing.
+    return InternetCheckConnection("https://api.github.com",FLAG_ICC_FORCE_CONNECTION,0);
+}
+
+std::string fetchLatestTag() {
+    HINTERNET initialize, connection, file;
+    DWORD dwBytes;
+    char buf[100000];
+    initialize = InternetOpen("Citrabot", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    connection = InternetConnect(initialize, "api.github.com", INTERNET_DEFAULT_HTTPS_PORT, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+    file = HttpOpenRequest(connection, "GET", "/repos/citra-emu/citra-bleeding-edge/releases/latest", "HTTP/1.1", NULL, NULL,
+                    INTERNET_FLAG_RELOAD | INTERNET_FLAG_EXISTING_CONNECT | INTERNET_FLAG_SECURE, 0);
+    std::string output;
+    if (HttpSendRequest(file, NULL, 0, NULL, 0)) {
+        while (InternetReadFile(file, &buf, sizeof(buf), &dwBytes)) {
+            if (dwBytes == 0) {
+                break;
+            }
+            output += buf;
+        }
+    }
+
+    InternetCloseHandle(file);
+    InternetCloseHandle(connection);
+    InternetCloseHandle(initialize);
+
+    // fetch the tag name from the json
+    std::string tag_name = "";
+    std::smatch match;
+    std::regex tag_regex(".*\"tag_name\":\\s*\"([^\"]*)\".*");
+    if (std::regex_search(output, match, tag_regex)) {
+        std::string tag_name = match[1];
+    }
+    return tag_name;
 }
 
 int main(int argc, char** argv) {
@@ -197,48 +237,42 @@ int main(int argc, char** argv) {
         }
     }
     // check for updates in the background
-    // fetch the latest tag number from github
-    auto r = cpr::Get(cpr::Url{"https://api.github.com/repos/citra-emu/citra-bleeding-edge/releases/latest"});
-    if (r.status_code == 200) {
-        // fetch the tag name from the json
-        std::smatch match;
-        std::regex tag_regex(".*\"tag_name\":\\s*\"(.*)\".*");
-        if (std::regex_search(r.text, match, tag_regex)) {
-            std::string tag_name = match[1];
-            // if the version is the same, just start citra
-            if (tag_name != Updater::tag_name) {
-                // Bring up the update dialog
-                HRESULT hr;
-                TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
-                int selection;
-                //BOOL checkbox;
-                std::wstring mbox_title = L"Citra";
-                std::wstring mbox_header = L"An update to Citra is available!";
-                std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-                std::wstring mbox_extra_info = converter.from_bytes("Current version: " + std::string(Updater::tag_name) + "\nLatest version: " + tag_name);
-                // TODO: save this to a settings file like updater.ini
-                //std::wstring mbox_checkbox_text = L"Don't ask me about updating again";
-                TASKDIALOG_BUTTON buttons[] = { { 1000, L"Update to the latest version" }, { 1001, L"Don't update right now" } };
+    // fetch the latest tag number from gith
+    if (checkInternetConnection()) {
+        std::string tag_name = fetchLatestTag();
+        // if the version is the same, just start citra
+        if (tag_name != "" && tag_name != Updater::tag_name) {
+            // Bring up the update dialog
+            HRESULT hr;
+            TASKDIALOGCONFIG tdc = { sizeof(TASKDIALOGCONFIG) };
+            int selection;
+            //BOOL checkbox;
+            std::wstring mbox_title = L"Citra";
+            std::wstring mbox_header = L"An update to Citra is available!";
+            std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+            std::wstring mbox_extra_info = converter.from_bytes("Current version: " + std::string(Updater::tag_name) + "\nLatest version: " + tag_name);
+            // TODO: save this to a settings file like updater.ini
+            //std::wstring mbox_checkbox_text = L"Don't ask me about updating again";
+            TASKDIALOG_BUTTON buttons[] = { { 1000, L"Update to the latest version" }, { 1001, L"Don't update right now" } };
 
-                tdc.hwndParent = nullptr;
-                tdc.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION|TDF_USE_COMMAND_LINKS;
-                tdc.pButtons = buttons;
-                tdc.cButtons = _countof(buttons);
-                tdc.nDefaultButton = 1000;
-                tdc.pszWindowTitle = mbox_title.c_str();
-                tdc.pszMainIcon = TD_INFORMATION_ICON;
-                tdc.pszMainInstruction = mbox_header.c_str();
-                tdc.pszExpandedInformation = mbox_extra_info.c_str();
-                //tdc.pszVerificationText = mbox_checkbox_text.c_str();
+            tdc.hwndParent = nullptr;
+            tdc.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION|TDF_USE_COMMAND_LINKS;
+            tdc.pButtons = buttons;
+            tdc.cButtons = _countof(buttons);
+            tdc.nDefaultButton = 1000;
+            tdc.pszWindowTitle = mbox_title.c_str();
+            tdc.pszMainIcon = TD_INFORMATION_ICON;
+            tdc.pszMainInstruction = mbox_header.c_str();
+            tdc.pszExpandedInformation = mbox_extra_info.c_str();
+            //tdc.pszVerificationText = mbox_checkbox_text.c_str();
 
-                hr = TaskDialogIndirect(&tdc, &selection, nullptr, nullptr);
-                if (selection == 1000) {
-                    // download the latest version and get it ready
-                    // TODO display some updater dialog... maybe the loading gif
-                    startProcessWrapper(updater_exe, "Update.exe --update=https://github.com/citra-emu/citra-bleeding-edge/releases/download/" + tag_name, true);
-                    // and we are done! Next boot it'll point to the new version.
-                    return 0;
-                }
+            hr = TaskDialogIndirect(&tdc, &selection, nullptr, nullptr);
+            if (selection == 1000) {
+                // download the latest version and get it ready
+                // TODO display some updater dialog... maybe the loading gif
+                startProcessWrapper(updater_exe, "Update.exe --update=https://github.com/citra-emu/citra-bleeding-edge/releases/download/" + tag_name, true);
+                // and we are done! Next boot it'll point to the new version.
+                return 0;
             }
         }
     }

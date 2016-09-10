@@ -8,7 +8,7 @@ deploy:
   description: |
     Build number $(appveyor_build_number)
 
-    If you are unsure what to download, [download and run the latest Setup.exe](https://github.com/citra-emu/citra-bleeding-edge/releases/download/bleeding-edge-$(appveyor_build_number)/Setup.exe)
+    If you are unsure what to download, [download and run the latest CitraSetup.exe](https://github.com/citra-emu/citra-bleeding-edge/releases/download/bleeding-edge-$(appveyor_build_number)/CitraSetup.exe)
   provider: GitHub
   auth_token:
     secure: 5iwe1T0xdmGxtJi8YIOfdUZvKNoriR5cqhfXN8QQ4J5Uj9syL6GeUNjgATkMzfCq
@@ -121,8 +121,8 @@ after_build:
           # First copy the citra exe files and all the dlls to the new release folder
           Copy-Item -path "$CMAKE_BINARY_DIR" -recurse -force -filter *.exe -destination $SQUIRREL_BIN_DIR
           $MingwDLLs = "Qt5Core.dll","Qt5Widgets.dll","Qt5Gui.dll","Qt5OpenGL.dll","libbz2-1.dll","libicudt56.dll","libicuin56.dll","libicuuc56.dll","libffi-6.dll","libfreetype-6.dll","libgcc_s_seh-1.dll","libglib-2.0-0.dll","libgobject-2.0-0.dll","libgraphite2.dll","libiconv-2.dll","libharfbuzz-0.dll","libintl-8.dll","libpcre-1.dll","libpcre16-0.dll","libpng16-16.dll","libstdc++-6.dll","libwinpthread-1.dll","SDL2.dll","zlib1.dll"
-          foreach ($element in $MingwDLLs) { 
-            Copy-Item -path "C:/msys64/mingw64/bin/$_.FullName" -force -destination "$SQUIRREL_BIN_DIR" 
+          foreach ($element in $MingwDLLs) {
+            Copy-Item -path "C:/msys64/mingw64/bin/$_.FullName" -force -destination "$SQUIRREL_BIN_DIR"
           }
           New-Item -ItemType Directory -Force -Path "$SQUIRREL_BIN_DIR/plugins/platforms" | Out-Null
           Copy-Item -path "C:/msys64/mingw64/share/qt5/plugins/platforms/qwindows.dll" -force -destination "$SQUIRREL_BIN_DIR/plugins/platforms"
@@ -136,6 +136,7 @@ after_build:
           Copy-Item -path "$SQUIRREL_RELEASE_DIR/citra*.nupkg" -recurse -force -destination $CMAKE_SOURCE_DIR
           Copy-Item -path "$SQUIRREL_RELEASE_DIR/RELEASES" -recurse -force -destination $CMAKE_SOURCE_DIR
           Copy-Item -path "$SQUIRREL_RELEASE_DIR/Setup.exe" -recurse -force -destination $CMAKE_SOURCE_DIR
+          Rename-Item -path "$CMAKE_SOURCE_DIR/Setup.exe" CitraSetup.exe
         }
 
 artifacts:
@@ -143,7 +144,7 @@ artifacts:
     name: FullPkg
   - path: citra.edge-0.1.$(APPVEYOR_BUILD_NUMBER)-delta.nupkg
     name: DeltaPkg
-  - path: Setup.exe
+  - path: CitraSetup.exe
     name: Installer
   - path: RELEASES
     name: RELEASES
