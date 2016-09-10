@@ -20,7 +20,7 @@ deploy:
 environment:
   matrix:
     - BUILD_TYPE: mingw
-    - BUILD_TYPE: msvc
+    #- BUILD_TYPE: msvc
   BUILD_PASSWORD:
     secure: EXGNlWKJsCtbeImEJ5EP9qrxZ+EqUFfNy+CP61nDOMA=
 
@@ -131,7 +131,6 @@ after_build:
           Start-Process -FilePath "$CMAKE_BINARY_DIR/nuget/nuget.exe" -ArgumentList "pack", "$CMAKE_BINARY_DIR/citra.nuspec", "-BasePath", "$SQUIRREL_BUILD_DIR", "-OutputDirectory", "$SQUIRREL_BUILD_DIR" | Wait-Process
           echo "Building squirrel"
           Start-Process -FilePath $CMAKE_BINARY_DIR/squirrel/squirrel.exe -ArgumentList "--releasify", "$SQUIRREL_BUILD_DIR/citra.edge.0.1.$APPVEYOR_BUILD_NUMBER.nupkg", "--releaseDir=$SQUIRREL_RELEASE_DIR", "--icon=$CMAKE_SOURCE_DIR/dist/citra.ico" | Wait-Process
-
           # copy the files to the root dir so it'll be easier to make them artifacts
           Copy-Item -path "$SQUIRREL_RELEASE_DIR/citra*.nupkg" -recurse -force -destination $CMAKE_SOURCE_DIR
           Copy-Item -path "$SQUIRREL_RELEASE_DIR/RELEASES" -recurse -force -destination $CMAKE_SOURCE_DIR

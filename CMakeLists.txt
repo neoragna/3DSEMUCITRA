@@ -241,11 +241,7 @@ add_subdirectory(externals/glad)
 include_directories(externals/microprofile)
 include_directories(externals/nihstro/include)
 
-if (MSVC)
-    add_subdirectory(externals/getopt)
-endif()
-
-if (WIN_CREATE_INSTALLER)
+if (WIN_CREATE_INSTALLER OR MSVC)
     add_subdirectory(externals/getopt)
 endif()
 
