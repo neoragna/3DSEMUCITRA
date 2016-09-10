@@ -1,5 +1,4 @@
 if (WIN_CREATE_INSTALLER)
-    include_directories(${CPR_INCLUDE_DIRS})
     # fill in the necessary details into the nuspec file template
     set(VERSION_BUILD_NUMBER $ENV{APPVEYOR_BUILD_NUMBER})
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/citra.nuspec ${CMAKE_BINARY_DIR}/citra.nuspec)
