@@ -17,7 +17,7 @@ namespace InputCore {
 constexpr u64 frame_ticks = 268123480ull / 60;
 static int tick_event;
 static Service::HID::PadState pad_state;
-static std::tuple<s16, s16> circle_pad = { 0,0 };
+static std::tuple<s16, s16> circle_pad { 0,0 };
 static std::shared_ptr<Keyboard> main_keyboard; ///< Keyboard is always active for Citra
 static std::vector<std::shared_ptr<IDevice>> devices; ///< Devices that are handling input for the game
 static std::mutex pad_state_mutex;
