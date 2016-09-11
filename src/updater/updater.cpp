@@ -3,7 +3,6 @@
 #include <array>
 #include <string>
 #include <iostream>
-#include <regex>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
@@ -12,6 +11,7 @@
 
 // Have to include getopt in the compilation unit or else its compiled with the wrong runtime
 #include "getopt.h"
+#include "json.hpp"
 #include "tagname.h"
 
 void startProcessWrapper(std::string name, std::string args, boolean wait) {
@@ -168,13 +168,15 @@ std::string fetchLatestTag() {
     InternetCloseHandle(initialize);
 
     // fetch the tag name from the json
-    std::string tag_name = "";
-    std::smatch match;
-    std::regex tag_regex(".*\"tag_name\":\\s*\"([^\"]*)\".*");
-    if (std::regex_search(output, match, tag_regex)) {
-        tag_name = match[1];
-    }
-    return tag_name;
+    // gcc seems to have spotty regex support still
+    // std::string tag_name = "";
+    // std::smatch match;
+    // std::regex tag_regex(".*\"tag_name\":\\s*\"([^\"]*)\".*");
+    // if (std::regex_search(output, match, tag_regex)) {
+    //     tag_name = match[1];
+    // }
+    auto js = nlohmann::json::parse(output.c_str());
+    return js["tag_name"];
 }
 
 int main(int argc, char** argv) {

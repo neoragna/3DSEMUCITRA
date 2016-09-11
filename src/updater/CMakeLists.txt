@@ -13,6 +13,7 @@ if (WIN_CREATE_INSTALLER)
         updater.manifest
     )
     set (HEADERS
+        json.hpp
         tagname.h
     )
 
