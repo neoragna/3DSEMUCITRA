@@ -741,7 +741,7 @@ const std::string& GetUserPath(const unsigned int DirIDX, const std::string &new
     static std::string paths[NUM_PATH_INDICES];
 
     // Set up all paths and files on the first run
-    if (paths[D_USER_IDX].empty())
+    if (unlikely(paths[D_USER_IDX].empty()))
     {
 #ifdef _WIN32
         paths[D_USER_IDX]   = GetExeDirectory() + DIR_SEP USERDATA_DIR DIR_SEP;
@@ -782,7 +782,7 @@ const std::string& GetUserPath(const unsigned int DirIDX, const std::string &new
         paths[F_MAINLOG_IDX]        = paths[D_LOGS_IDX] + MAIN_LOG;
     }
 
-    if (!newPath.empty())
+    if (unlikely(!newPath.empty()))
     {
         if (!FileUtil::IsDirectory(newPath))
         {
