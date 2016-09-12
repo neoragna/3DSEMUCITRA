@@ -58,7 +58,7 @@ ResultCode Applet::Create(Service::APT::AppletId id) {
         applets[id] = std::make_shared<ErrEula>(id);
         break;
     default:
-        LOG_ERROR(Service_APT, "Could not create applet %u", id);
+        LOG_ERROR(Service_APT, "Could not create applet 0x%08X", id);
         // TODO(Subv): Find the right error code
         return ResultCode(ErrorDescription::NotFound, ErrorModule::Applet, ErrorSummary::NotSupported, ErrorLevel::Permanent);
     }
@@ -71,6 +71,17 @@ std::shared_ptr<Applet> Applet::Get(Service::APT::AppletId id) {
     if (itr != applets.end())
         return itr->second;
     return nullptr;
+}
+
+u32 GetRegisteredAppletCount() {
+    u32 registered_count = 0;
+
+    for (auto itr = applets.begin(); itr != applets.end(); ++itr) {
+        if (itr->second != nullptr) {
+            ++registered_count;
+        }
+    }
+    return registered_count;
 }
 
 /// Handles updating the current Applet every time it's called.

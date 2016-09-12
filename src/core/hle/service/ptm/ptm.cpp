@@ -44,6 +44,10 @@ void GetShellState(Service::Interface* self) {
     cmd_buff[2] = shell_open ? 1 : 0;
 }
 
+bool GetShellState() {
+    return shell_open;
+}
+
 void GetBatteryLevel(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
 
