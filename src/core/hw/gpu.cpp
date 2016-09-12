@@ -307,7 +307,7 @@ inline void Write(u32 addr, const T data) {
                         }
 
                         if (!dst_pointer) {
-                            LOG_CRITICAL(HW_GPU, "Invalid address %08x". dst_pointer);
+                            LOG_CRITICAL(HW_GPU, "Invalid address %08x", dst_pointer);
                             break;
                         }
                         const u8* src_pixel = src_pointer + src_offset;
