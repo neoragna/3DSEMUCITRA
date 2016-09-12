@@ -473,14 +473,13 @@ bool ForeachDirectoryEntry(unsigned* num_entries_out, const std::string &directo
     do {
         const std::string virtual_name(Common::UTF16ToUTF8(ffd.cFileName));
 #else
-    struct dirent dirent, *result = nullptr;
-
     DIR *dirp = opendir(directory.c_str());
     if (!dirp)
         return false;
 
     // non windows loop
-    while (!readdir_r(dirp, &dirent, &result) && result) {
+    struct dirent* result;
+    while ((result = readdir(dirp))) {
         const std::string virtual_name(result->d_name);
 #endif
 
@@ -576,12 +575,11 @@ void CopyDir(const std::string &source_path, const std::string &dest_path)
     if (!FileUtil::Exists(source_path)) return;
     if (!FileUtil::Exists(dest_path)) FileUtil::CreateFullPath(dest_path);
 
-    struct dirent dirent, *result = nullptr;
     DIR *dirp = opendir(source_path.c_str());
     if (!dirp) return;
 
-    while (!readdir_r(dirp, &dirent, &result) && result)
-    {
+    struct dirent* result;
+    while ((result = readdir(dirp))) {
         const std::string virtualName(result->d_name);
         // check for "." and ".."
         if (((virtualName[0] == '.') && (virtualName[1] == '\0')) ||
