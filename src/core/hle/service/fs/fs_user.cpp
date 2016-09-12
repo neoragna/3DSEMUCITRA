@@ -357,12 +357,14 @@ static void OpenDirectory(Service::Interface* self) {
 /**
  * FS_User::OpenArchive service function
  *  Inputs:
+ *      0 : Header Code [0x080C00C2]
  *      1 : Archive ID
  *      2 : Archive low path type
  *      3 : Archive low path size
  *      4 : (LowPathSize << 14) | 2
  *      5 : Archive low path
  *  Outputs:
+ *      0 : Header code
  *      1 : Result of function, 0 on success, otherwise error code
  *      2 : Archive handle lower word (unused)
  *      3 : Archive handle upper word (same as file handle)
@@ -379,6 +381,8 @@ static void OpenArchive(Service::Interface* self) {
     LOG_DEBUG(Service_FS, "archive_id=0x%08X archive_path=%s", archive_id, archive_path.DebugStr().c_str());
 
     ResultVal<ArchiveHandle> handle = OpenArchive(archive_id, archive_path);
+
+    cmd_buff[0] = IPC::MakeHeader(0x80C, 0x3, 0); // 0x080C00C0
     cmd_buff[1] = handle.Code().raw;
     if (handle.Succeeded()) {
         cmd_buff[2] = *handle & 0xFFFFFFFF;
@@ -391,19 +395,105 @@ static void OpenArchive(Service::Interface* self) {
 }
 
 /**
+ * FS_User::ControlArchive service function
+ *  Inputs:
+ *      0 : Header code [0x080D0144]
+ *    1-2 : u64, Archive Handle
+ *      3 : Action
+ *      4 : Input Size
+ *      5 : Output Size
+ *      6 : (inputSize << 4) | 0xA
+ *      7 : void* Input
+ *      8 : (outputSize << 4) | 0xC
+ *      9 : void* Output
+ *  Outputs:
+ *      0 : Header code
+ *      1 : Result code
+ *  Notes:
+ *      Action:
+ *             0 : Commits save data changes.
+ *                     Input : None
+ *                    Output : None
+ *             1 : Retrieves a file's last-modified timestamp
+ *                     Input : u16*, UTF-16 Path
+ *                    Output : u64, Time Stamp
+ *         30877 : Calls FSPXI command 0x00560102(unknown)
+ *                     Input : u16*, 12 bytes
+ *                    Output : 16 bytes
+ */
+static void ControlArchive(Service::Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+
+    ArchiveHandle archive_handle = MakeArchiveHandle(cmd_buff[1], cmd_buff[2]);
+    u32 action = cmd_buff[3];
+    u32 input_size = cmd_buff[4];
+    u32 output_size = cmd_buff[5];
+    u32 input_translation = cmd_buff[6];
+    u32 input_buffer = cmd_buff[7];
+    u32 output_translation = cmd_buff[8];
+    u32 output_buffer = cmd_buff[9];
+
+    if (!IPC::CheckBufferMappingTranslation(IPC::MappedBufferPermissions::R, input_size, input_translation)) {
+        cmd_buff[0] = IPC::MakeHeader(0x0, 1, 0); // 0x40
+        cmd_buff[1] = ResultCode(ErrorDescription::OS_InvalidBufferDescriptor, ErrorModule::OS,
+                                 ErrorSummary::WrongArgument, ErrorLevel::Permanent).raw; // 0xD9001830
+        LOG_ERROR(Service_FS, "Check input_buffer_mapping_translation failed");
+        return;
+    }
+
+    if (!IPC::CheckBufferMappingTranslation(IPC::MappedBufferPermissions::W, output_size, output_translation)) {
+        cmd_buff[0] = IPC::MakeHeader(0x0, 1, 0); // 0x40
+        cmd_buff[1] = ResultCode(ErrorDescription::OS_InvalidBufferDescriptor, ErrorModule::OS,
+                                 ErrorSummary::WrongArgument, ErrorLevel::Permanent).raw; // 0xD9001830
+        LOG_ERROR(Service_FS, "Check output_buffer_mapping_translation failed");
+        return;
+    }
+
+    switch (action) {
+    case 0: // Action 0 : Commits save data changes.
+        cmd_buff[0] = IPC::MakeHeader(0x80D, 1, 4); // 0x080d0044
+        cmd_buff[1] = CommitSavedata(archive_handle).raw;
+        cmd_buff[2] = input_translation;
+        cmd_buff[3] = input_buffer;
+        cmd_buff[4] = output_translation;
+        cmd_buff[5] = output_buffer;
+        LOG_WARNING(Service_FS, "(STUBBED) Commits save data changes, archive_handle=0x%08X",archive_handle);
+        break;
+    case 1: // Action 1 : Retrieves a file's last-modified timestamp.
+        cmd_buff[0] = IPC::MakeHeader(0x80D, 1, 4); // 0x080d0044
+        cmd_buff[1] = GetTimeStamp(input_buffer, input_size, output_buffer, output_size).raw;
+        cmd_buff[2] = input_translation;
+        cmd_buff[3] = input_buffer;
+        cmd_buff[4] = output_translation;
+        cmd_buff[5] = output_buffer;
+        LOG_WARNING(Service_FS, "Retrieves a file's last-modified timestamp");
+        break;
+    case 30877:
+    default:
+        cmd_buff[0] = IPC::MakeHeader(0x80D, 1, 0);
+        cmd_buff[1] = ResultCode(ErrorDescription::NotImplemented, ErrorModule::FS,
+            ErrorSummary::NotSupported, ErrorLevel::Permanent).raw;
+        UNIMPLEMENTED();
+        return;
+    }
+}
+
+/**
  * FS_User::CloseArchive service function
  *  Inputs:
  *      0 : 0x080E0080
  *      1 : Archive handle low word
  *      2 : Archive handle high word
  *  Outputs:
- *      0 : ??? TODO(yuriks): Verify return header
+ *      0 : Header code
  *      1 : Result of function, 0 on success, otherwise error code
  */
 static void CloseArchive(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
 
     ArchiveHandle archive_handle = MakeArchiveHandle(cmd_buff[1], cmd_buff[2]);
+
+    cmd_buff[0] = IPC::MakeHeader(0x80E, 0x1, 0); // 0x080E0040
     cmd_buff[1] = CloseArchive(archive_handle).raw;
 }
 
@@ -848,7 +938,7 @@ const Interface::FunctionInfo FunctionTable[] = {
     {0x080A0244, RenameDirectory,          "RenameDirectory"},
     {0x080B0102, OpenDirectory,            "OpenDirectory"},
     {0x080C00C2, OpenArchive,              "OpenArchive"},
-    {0x080D0144, nullptr,                  "ControlArchive"},
+    {0x080D0144, ControlArchive,           "ControlArchive"},
     {0x080E0080, CloseArchive,             "CloseArchive"},
     {0x080F0180, FormatThisUserSaveData,   "FormatThisUserSaveData"},
     {0x08100200, CreateLegacySystemSaveData, "CreateLegacySystemSaveData"},
