@@ -11,14 +11,14 @@
 
 namespace Settings {
 
-namespace NativeInput {
-
 enum class LayoutOption {
     Default,
     SingleScreen,
     LargeScreen,
     Custom,
 };
+
+namespace NativeInput {
 
 enum Values {
     // directly mapped keys
