@@ -504,4 +504,36 @@ std::string StringFromFixedZeroTerminatedBuffer(const char * buffer, size_t max_
     return std::string(buffer, len);
 }
 
+std::string LTrim(std::string & s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(),
+        std::not1(std::ptr_fun<int, int>(std::isspace))));
+    return s;
+}
+
+std::string RTrim(std::string & s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(),
+        std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+    return s;
+}
+
+std::string Trim(std::string & s) {
+    auto temp = RTrim(s);
+    auto temp2 = LTrim(temp);
+    return temp2;
+}
+
+std::string Join(const std::vector<std::string>& elements, const char* const separator) {
+    switch (elements.size()) {
+    case 0:
+        return "";
+    case 1:
+        return elements[0];
+    default:
+        std::ostringstream os;
+        std::copy(elements.begin(), elements.end() - 1, std::ostream_iterator<std::string>(os, separator));
+        os << *elements.rbegin();
+        return os.str();
+    }
+}
+
 }

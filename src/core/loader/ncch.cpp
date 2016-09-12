@@ -24,7 +24,7 @@ namespace Loader {
 
 static const int kMaxSections = 8;        ///< Maximum number of sections (files) in an ExeFs
 static const int kBlockSize   = 0x200;    ///< Size of ExeFS blocks (in bytes)
-
+u64_le program_id = 0;
 /**
  * Get the decompressed size of an LZSS compressed ExeFS file
  * @param buffer Buffer of compressed file
@@ -273,7 +273,7 @@ ResultStatus AppLoader_NCCH::LoadExeFS() {
     LOG_DEBUG(Loader, "Core version:                %d"    , core_version);
     LOG_DEBUG(Loader, "Thread priority:             0x%X"  , priority);
     LOG_DEBUG(Loader, "Resource limit category:     %d"    , resource_limit_category);
-
+    Loader::program_id = ncch_header.program_id;
     if (exheader_header.arm11_system_local_caps.program_id != ncch_header.program_id) {
         LOG_ERROR(Loader, "ExHeader Program ID mismatch: the ROM is probably encrypted.");
         return ResultStatus::ErrorEncrypted;
