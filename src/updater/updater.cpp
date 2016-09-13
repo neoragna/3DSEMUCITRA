@@ -128,14 +128,45 @@ void copyPreviousInstallsUserFolder(std::string path) {
     if (ftyp != INVALID_FILE_ATTRIBUTES && (ftyp & FILE_ATTRIBUTE_DIRECTORY)) {
         // copy the old user directory over. Yes. SHFileOperation requires double null terminated strings
         // TODO: Remove SHFileOperation and change it to IFileOperation
-        const char* copy_from = std::string(user_folder_old + "\\*").c_str() + '\0';
-        const char* copy_to = user_folder_new.c_str() + '\0';
+        user_folder_old += "\\*";
+        const char* copy_from = user_folder_old.c_str() + '\0' + '\0';
+        const char* copy_to = user_folder_new.c_str() + '\0' + '\0';
         s.hwnd = nullptr;
         s.wFunc = FO_COPY;
         s.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
         s.pTo = copy_to;
         s.pFrom = copy_from;
         SHFileOperation(&s);
+        // Well, here is my attempt to use IFileOperation :p Fails with can't use MFC and windows.h at the same time
+        //HRESULT hr;
+        //CFileFind finder;
+        //std::string srcDir = user_folder_old;
+        //std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+        //std::wstring dstDir = converter.from_bytes(user_folder_new);
+
+        //CComPtr<IFileOperation> fileOp;
+        //fileOp.CoCreateInstance(CLSID_FileOperation);
+        //fileOp->SetOperationFlags(FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR);
+
+        //srcDir += "\\*";
+        //BOOL next = finder.FindFile(srcDir.c_str());
+        //while (next) {
+        //    next = finder.FindNextFile();
+        //    if (finder.IsDots())
+        //        continue;
+
+        //    CComPtr<IShellItem> src, dst;
+        //    CComBSTR bstr = finder.GetFilePath();
+        //    if (S_OK != SHCreateItemFromParsingName(bstr, NULL, IID_PPV_ARGS(&src)))
+        //        continue;
+
+        //    if (S_OK != SHCreateItemFromParsingName(dstDir.c_str(), NULL, IID_PPV_ARGS(&dst)))
+        //        continue;
+
+        //    fileOp->CopyItem(src, dst, 0, NULL);
+        //}
+
+        //hr = fileOp->PerformOperations();
     }
     // if the old folder doesn't have a user directory, just ignore it.
 }
