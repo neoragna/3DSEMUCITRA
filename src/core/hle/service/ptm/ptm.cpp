@@ -5,6 +5,7 @@
 #include "common/logging/log.h"
 #include "core/settings.h"
 #include "core/file_sys/file_backend.h"
+#include "core/hle/svc.h"
 #include "core/hle/service/fs/archive.h"
 #include "core/hle/service/ptm/ptm.h"
 #include "core/hle/service/ptm/ptm_play.h"
@@ -14,7 +15,6 @@
 
 namespace Service {
 namespace PTM {
-
 /// Values for the default gamecoin.dat file
 static const GameCoin default_game_coin = { 0x4F00, 42, 0, 0, 0, 2014, 12, 29 };
 
@@ -97,10 +97,21 @@ void CheckNew3DS(Service::Interface* self) {
         LOG_CRITICAL(Service_PTM, "The option 'is_new_3ds' is enabled as part of the 'System' settings. Citra does not fully support New 3DS emulation yet!");
     }
 
+    cmd_buff[0] = IPC::MakeHeader(0x40A, 0x2, 0);
     cmd_buff[1] = RESULT_SUCCESS.raw;
     cmd_buff[2] = is_new_3ds ? 1 : 0;
 
     LOG_WARNING(Service_PTM, "(STUBBED) called isNew3DS = 0x%08x", static_cast<u32>(is_new_3ds));
+}
+
+void ConfigureNew3DSCPU(Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+    u32 value = cmd_buff[1] & 0xF;
+
+    cmd_buff[0] = IPC::MakeHeader(0x818, 0x1, 0);
+    cmd_buff[1] = SVC::KernelSetState(static_cast<u32>(SVC::KernelSetStateType::ConfigureNew3DSCPU), value, 0, 0).raw;
+
+    LOG_WARNING(Service_PTM, "(STUBBED) called");
 }
 
 void Init() {
