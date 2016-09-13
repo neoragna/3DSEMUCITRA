@@ -2,12 +2,33 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#include "common/logging/log.h"
+
 #include "core/hle/service/mic_u.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Namespace MIC_U
 
 namespace MIC_U {
+
+/**
+ * MIC_U::SetClientVersion service function
+ *  Inputs:
+ *      1 : Used SDK Version
+ *  Outputs:
+ *      1 : Result of function, 0 on success, otherwise error code
+ */
+static void SetClientVersion(Service::Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+
+    const u32 version = cmd_buff[1];
+    self->SetVersion(version);
+
+    LOG_WARNING(Service_MIC, "(STUBBED) called, version: 0x%08X", version);
+
+    cmd_buff[1] = RESULT_SUCCESS.raw; // No error
+}
+
 
 const Interface::FunctionInfo FunctionTable[] = {
     {0x00010042, nullptr,               "MapSharedMem"},
@@ -25,7 +46,7 @@ const Interface::FunctionInfo FunctionTable[] = {
     {0x000D0040, nullptr,               "SetClamp"},
     {0x000E0000, nullptr,               "GetClamp"},
     {0x000F0040, nullptr,               "SetAllowShellClosed"},
-    {0x00100040, nullptr,               "unknown_input2"},
+    {0x00100040, SetClientVersion,      "SetClientVersion"},
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
