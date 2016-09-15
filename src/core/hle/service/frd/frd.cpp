@@ -86,7 +86,7 @@ void GetMyFriendKey(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
 
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
-    Memory::WriteBlock(cmd_buff[2], &my_friend_key, sizeof(FriendKey));
+    std::memcpy(&cmd_buff[2], &my_friend_key, sizeof(FriendKey));
     LOG_WARNING(Service_FRD, "(STUBBED) called");
 }
 
@@ -97,6 +97,18 @@ void GetMyScreenName(Service::Interface* self) {
     // TODO: (mailwl) get the name from config
     Common::UTF8ToUTF16("Citra").copy(reinterpret_cast<char16_t*>(&cmd_buff[2]), 11);
     LOG_WARNING(Service_FRD, "(STUBBED) called");
+}
+
+void SetClientSdkVersion(Service::Interface* self) {
+    u32* cmd_buff = Kernel::GetCommandBuffer();
+
+    const u32 version = cmd_buff[1];
+
+    self->SetVersion(version);
+
+    LOG_WARNING(Service_FRD, "(STUBBED) called, version: 0x%08X", version);
+
+    cmd_buff[1] = RESULT_SUCCESS.raw; // No error
 }
 
 void Init() {
