@@ -29,6 +29,14 @@
     #define FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
+#if defined(__GNUC__)
+    #define likely(x) __builtin_expect(!!(x), 1)
+    #define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+    #define likely(x) (x)
+    #define unlikely(x) (x)
+#endif
+
 #ifndef _MSC_VER
 
 #ifdef ARCHITECTURE_x86_64
