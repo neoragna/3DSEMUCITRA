@@ -4,9 +4,9 @@
 
 #include "common/scm_rev.h"
 
-#define GIT_REV      "@GIT_REV@"
-#define GIT_BRANCH   "@GIT_BRANCH@"
-#define GIT_DESC     "@GIT_DESC@"
+#define GIT_REV      "c30ea8b65506cee4e48c459ddd4f511cf55736f0"
+#define GIT_BRANCH   "master"
+#define GIT_DESC     "c30ea8b-dirty"
 
 namespace Common {
 

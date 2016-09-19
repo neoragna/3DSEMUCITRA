@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "common/common_types.h"
+#include "common/framebuffer_layout.h"
 #include "common/math_util.h"
 
 #include "core/hle/service/hid/hid.h"
@@ -41,22 +42,11 @@ public:
         std::pair<unsigned,unsigned> min_client_area_size;
     };
 
-    /// Describes the layout of the window framebuffer (size and top/bottom screen positions)
-    struct FramebufferLayout {
-
-        /**
-         * Factory method for constructing a default FramebufferLayout
-         * @param width Window framebuffer width in pixels
-         * @param height Window framebuffer height in pixels
-         * @return Newly created FramebufferLayout object with default screen regions initialized
-         */
-        static FramebufferLayout DefaultScreenLayout(unsigned width, unsigned height);
-
-        unsigned width;
-        unsigned height;
-        MathUtil::Rectangle<unsigned> top_screen;
-        MathUtil::Rectangle<unsigned> bottom_screen;
-    };
+    /**
+     * Convenience method to update the VideoCore EmuWindow
+     * Read from the current settings to determine which layout to use.
+     */
+    void UpdateCurrentFramebufferLayout(unsigned width, unsigned height);
 
     /// Swap buffers to display the next frame
     virtual void SwapBuffers() = 0;
