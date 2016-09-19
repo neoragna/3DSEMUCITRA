@@ -517,8 +517,7 @@ void GMainWindow::ToggleWindowMode() {
 void GMainWindow::OnConfigure() {
     ConfigureDialog configureDialog(this);
     auto result = configureDialog.exec();
-    if (result == QDialog::Accepted)
-    {
+    if (result == QDialog::Accepted) {
         configureDialog.applyConfiguration();
         config->Save();
     }
