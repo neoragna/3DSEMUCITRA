@@ -15,13 +15,6 @@
 namespace Settings {
 namespace NativeInput {
 
-enum class LayoutOption {
-    Default,
-    SingleScreen,
-    LargeScreen,
-    Custom,
-};
-
 enum Values {
     // directly mapped keys
     A, B, X, Y,
@@ -62,6 +55,14 @@ enum class DeviceFramework {
 enum class Device {
     Keyboard, Gamepad
 };
+
+enum class LayoutOption {
+    Default,
+    SingleScreen,
+    LargeScreen,
+    Custom,
+};
+
 struct InputDeviceMapping {
     DeviceFramework framework = DeviceFramework::Qt;
     int number = 0;
