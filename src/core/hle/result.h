@@ -17,6 +17,7 @@
 /// Detailed description of the error. This listing is likely incomplete.
 enum class ErrorDescription : u32 {
     Success = 0,
+    InvalidMemoryPermissions = 2,
     WrongPermission = 46,
     OS_InvalidBufferDescriptor = 48,
     WrongAddress = 53,

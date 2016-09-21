@@ -55,6 +55,9 @@ void GetAdapterState(Interface* self);
  */
 void GetShellState(Interface* self);
 
+// Return the 3DS's physical shell state
+bool GetShellState();
+
 /**
  * PTM::GetBatteryLevel service function
  *  Outputs:
