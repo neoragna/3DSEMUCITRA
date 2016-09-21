@@ -9,6 +9,8 @@
 #include <wininet.h>
 #include <commctrl.h>
 
+#include <fstream>
+
 // Have to include getopt in the compilation unit or else its compiled with the wrong runtime
 #include "getopt.h"
 #include "json.hpp"
@@ -73,19 +75,25 @@ void installMSVCRuntime(const char* msvc_redist_exe) {
 }
 
 // Search for the previous install (if there is one) and copy the user directory into the new install
+// TODO: Use the version info that squirrel gives us select the right folder
 void copyPreviousInstallsUserFolder(std::string path) {
     WIN32_FIND_DATA found_file;
     std::string old_user_dir;
     std::string new_user_dir;
     SHFILEOPSTRUCT s = { 0 };
     HANDLE h;
-    std::array<std::string, 2> app_folder_paths;
+    std::array<std::string, 2> app_folder_paths{ "", "" };
     std::string user_folder_old;
     std::string user_folder_new;
     const char* search_path;
     DWORD ftyp;
+    std::ofstream myfile;
+    myfile.open (".\\log.txt");
+    myfile << "Starting copy of old user folder " << std::endl;
+    myfile << "path " << path << std::endl;
 
     search_path = (path.substr(0, path.find_last_of("\\/")) + "\\*").c_str();
+    myfile << "search path " << search_path << std::endl;
     h = FindFirstFileEx(search_path, FindExInfoStandard, &found_file, FindExSearchLimitToDirectories, NULL, 0);
     if (h != INVALID_HANDLE_VALUE) {
         int index = 0;
@@ -124,6 +132,9 @@ void copyPreviousInstallsUserFolder(std::string path) {
     // See if the old directory even has a user folder. (Note: It should unless they deleted it)
     user_folder_old = app_folder_paths[0] + "\\user";
     user_folder_new = app_folder_paths[1] + "\\user";
+    myfile << "old " << user_folder_old << std::endl;
+    myfile << "new " << user_folder_new << std::endl;
+
     ftyp = GetFileAttributesA(user_folder_old.c_str());
     if (ftyp != INVALID_FILE_ATTRIBUTES && (ftyp & FILE_ATTRIBUTE_DIRECTORY)) {
         // copy the old user directory over. Yes. SHFileOperation requires double null terminated strings
@@ -136,7 +147,8 @@ void copyPreviousInstallsUserFolder(std::string path) {
         s.fFlags = FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR;
         s.pTo = copy_to;
         s.pFrom = copy_from;
-        SHFileOperation(&s);
+        int result = SHFileOperation(&s);
+        myfile << "SHFileOperation return code: " << result << std::endl;
         // Well, here is my attempt to use IFileOperation :p Fails with can't use MFC and windows.h at the same time
         //HRESULT hr;
         //CFileFind finder;
@@ -169,6 +181,8 @@ void copyPreviousInstallsUserFolder(std::string path) {
         //hr = fileOp->PerformOperations();
     }
     // if the old folder doesn't have a user directory, just ignore it.
+    myfile << "ending copy of old user folder " << std::endl;
+    myfile.close();
 }
 
 bool checkInternetConnection() {
@@ -258,6 +272,8 @@ int main(int argc, char** argv) {
             case 'u':
                 // Update: Find the old user directory and copy it over
                 copyPreviousInstallsUserFolder(path);
+                startProcessWrapper(updater_exe, "Update.exe --removeShortcut=updater.exe", true);
+                startProcessWrapper(updater_exe, "Update.exe --createShortcut=updater.exe", true);
                 startProcessWrapper(updater_exe, "Update.exe --processStart=citra-qt.exe", false);
                 return 0;
             case 'r':
