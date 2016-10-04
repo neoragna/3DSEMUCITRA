@@ -41,6 +41,8 @@ public:
         int     res_height;
         std::pair<unsigned,unsigned> min_client_area_size;
     };
+	
+    enum StereoscopicMode { LeftOnly, RightOnly, Anaglyph };
 
     /**
      * Convenience method to update the VideoCore EmuWindow
@@ -78,6 +80,35 @@ public:
     void TouchMoved(unsigned framebuffer_x, unsigned framebuffer_y);
 
     /**
+     * Signal accelerometer state has changed.
+     * @param x X-axis accelerometer value
+     * @param y Y-axis accelerometer value
+     * @param z Z-axis accelerometer value
+     * @note all values are in unit of g (gravitational acceleration).
+     *    e.g. x = 1.0 means 9.8m/s^2 in x direction.
+     * @see GetAccelerometerState for axis explanation.
+     */
+    void AccelerometerChanged(float x, float y, float z);
+
+    /**
+     * Signal gyroscope state has changed.
+     * @param x X-axis accelerometer value
+     * @param y Y-axis accelerometer value
+     * @param z Z-axis accelerometer value
+     * @note all values are in deg/sec.
+     * @see GetGyroscopeState for axis explanation.
+     */
+    void GyroscopeChanged(float x, float y, float z);
+
+    /**
+     * Signal that a 3d depth slider change has occurred
+     * @param value new value for 3d depth slider;
+     */
+    void DepthSliderChanged(float value);
+
+    void StereoscopicModeChanged(StereoscopicMode mode);
+
+    /**
      * Gets the current accelerometer state (acceleration along each three axis).
      * Axis explained:
      *   +x is the same direction as LEFT on D-pad.
@@ -87,12 +118,11 @@ public:
      *   1 unit of return value = 1/512 g (measured by hw test),
      *   where g is the gravitational acceleration (9.8 m/sec2).
      * @note This should be called by the core emu thread to get a state set by the window thread.
-     * @todo Implement accelerometer input in front-end.
+     * @todo Fix this function to be thread-safe.
      * @return std::tuple of (x, y, z)
      */
-    std::tuple<s16, s16, s16> GetAccelerometerState() const {
-        // stubbed
-        return std::make_tuple(0, -512, 0);
+    std::tuple<s16, s16, s16> GetAccelerometerState() {
+        return std::make_tuple(accel_x, accel_y, accel_z);
     }
 
     /**
@@ -109,9 +139,8 @@ public:
      * @todo Implement gyroscope input in front-end.
      * @return std::tuple of (x, y, z)
      */
-    std::tuple<s16, s16, s16> GetGyroscopeState() const {
-        // stubbed
-        return std::make_tuple(0, 0, 0);
+    std::tuple<s16, s16, s16> GetGyroscopeState() {
+        return std::make_tuple(gyro_x, gyro_y, gyro_z);
     }
 
     /**
@@ -123,6 +152,22 @@ public:
      */
     f32 GetGyroscopeRawToDpsCoefficient() const {
         return 14.375f; // taken from hw test, and gyroscope's document
+    }
+	
+	/**
+     * Gets the value of the 3D depth slider.
+     * @return float-type value
+     */
+    f32 GetDepthSliderValue() const {
+        return depth_slider;
+    }
+
+    /**
+     * Gets the stereoscopic mode.
+     * @return StereoscopicMode value
+     */
+    StereoscopicMode GetStereoscopicMode() const {
+        return stereoscopic_mode;
     }
 
     /**
@@ -154,6 +199,14 @@ protected:
         // TODO: Find a better place to set this.
         config.min_client_area_size = std::make_pair(400u, 480u);
         active_config = config;
+        accel_x = 0;
+        accel_y = -512;
+        accel_z = 0;
+        gyro_x = 0;
+        gyro_y = 0;
+        gyro_z = 0;
+        depth_slider = 0.0f;
+        stereoscopic_mode = Anaglyph;
     }
     virtual ~EmuWindow() {}
 
@@ -209,6 +262,18 @@ private:
     WindowConfig active_config;  ///< Internal active configuration
 
     bool touch_pressed;          ///< True if touchpad area is currently pressed, otherwise false
+	
+    s16 accel_x; ///< Accelerometer X-axis value in native 3DS units
+    s16 accel_y; ///< Accelerometer Y-axis value in native 3DS units
+    s16 accel_z; ///< Accelerometer Z-axis value in native 3DS units
+
+    s16 gyro_x; ///< Gyroscope X-axis value in native 3DS units
+    s16 gyro_y; ///< Gyroscope Y-axis value in native 3DS units
+    s16 gyro_z; ///< Gyroscope Z-axis value in native 3DS units
+	
+    f32 depth_slider; ///< 3D depth slider (0.0-1.0)
+
+    StereoscopicMode stereoscopic_mode; ///< stereoscopic mode
 
    /**
     * Clip the provided coordinates to be inside the touchscreen area.

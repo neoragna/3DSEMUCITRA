@@ -22,6 +22,7 @@
 #include "citra_qt/game_list.h"
 #include "citra_qt/hotkeys.h"
 #include "citra_qt/main.h"
+#include "citra_qt/stereoscopic_controller.h"
 #include "citra_qt/ui_settings.h"
 
 // Debugger
@@ -68,6 +69,10 @@ GMainWindow::GMainWindow() : config(new Config()), emu_thread(nullptr)
 
     game_list = new GameList();
     ui.horizontalLayout->addWidget(game_list);
+	
+    stereoscopicControllerWidget = new StereoscopicControllerWidget(this);
+    addDockWidget(Qt::LeftDockWidgetArea, stereoscopicControllerWidget);
+    stereoscopicControllerWidget->setFloating(true);
 
     profilerWidget = new ProfilerWidget(this);
     addDockWidget(Qt::BottomDockWidgetArea, profilerWidget);
@@ -110,8 +115,11 @@ GMainWindow::GMainWindow() : config(new Config()), emu_thread(nullptr)
     addDockWidget(Qt::RightDockWidgetArea, graphicsTracingWidget);
     graphicsTracingWidget->hide();
 
-    auto graphicsSurfaceViewerAction = new QAction(tr("Create Pica surface viewer"), this);
+    auto graphicsSurfaceViewerAction = new QAction(tr("Create Pica Surface Viewer"), this);
     connect(graphicsSurfaceViewerAction, SIGNAL(triggered()), this, SLOT(OnCreateGraphicsSurfaceViewer()));
+	
+    ui.menu_Emulation->addSeparator();
+    ui.menu_Emulation->addAction(stereoscopicControllerWidget->toggleViewAction());
 
     QMenu* debug_menu = ui.menu_View->addMenu(tr("Debugging"));
     debug_menu->addAction(graphicsSurfaceViewerAction);
@@ -179,6 +187,16 @@ GMainWindow::GMainWindow() : config(new Config()), emu_thread(nullptr)
     connect(ui.action_Pause, SIGNAL(triggered()), this, SLOT(OnPauseGame()));
     connect(ui.action_Stop, SIGNAL(triggered()), this, SLOT(OnStopGame()));
     connect(ui.action_Single_Window_Mode, SIGNAL(triggered(bool)), this, SLOT(ToggleWindowMode()));
+	
+    connect(this, SIGNAL(EmulationStarting(EmuThread*)), stereoscopicControllerWidget,
+            SLOT(OnEmulationStarting(EmuThread*)));
+    connect(this, SIGNAL(EmulationStopping()), stereoscopicControllerWidget,
+            SLOT(OnEmulationStopping()));
+    connect(stereoscopicControllerWidget, SIGNAL(DepthChanged(float)), this,
+            SLOT(OnDepthChanged(float)));
+    connect(stereoscopicControllerWidget,
+            SIGNAL(StereoscopeModeChanged(EmuWindow::StereoscopicMode)), this,
+            SLOT(OnStereoscopeModeChanged(EmuWindow::StereoscopicMode)));
 
     connect(this, SIGNAL(EmulationStarting(EmuThread*)), disasmWidget, SLOT(OnEmulationStarting(EmuThread*)));
     connect(this, SIGNAL(EmulationStopping()), disasmWidget, SLOT(OnEmulationStopping()));
@@ -188,8 +206,7 @@ GMainWindow::GMainWindow() : config(new Config()), emu_thread(nullptr)
     connect(this, SIGNAL(EmulationStopping()), render_window, SLOT(OnEmulationStopping()));
     connect(this, SIGNAL(EmulationStarting(EmuThread*)), graphicsTracingWidget, SLOT(OnEmulationStarting(EmuThread*)));
     connect(this, SIGNAL(EmulationStopping()), graphicsTracingWidget, SLOT(OnEmulationStopping()));
-
-
+	
     // Setup hotkeys
     RegisterHotkey("Main Window", "Load File", QKeySequence::Open);
     RegisterHotkey("Main Window", "Start Emulation");
@@ -209,6 +226,14 @@ GMainWindow::GMainWindow() : config(new Config()), emu_thread(nullptr)
     if (args.length() >= 2) {
         BootGame(args[1].toStdString());
     }
+}
+
+void GMainWindow::OnDepthChanged(float v) {
+    VideoCore::g_emu_window->DepthSliderChanged(v);
+}
+
+void GMainWindow::OnStereoscopeModeChanged(EmuWindow::StereoscopicMode mode) {
+    VideoCore::g_emu_window->StereoscopicModeChanged(mode);
 }
 
 GMainWindow::~GMainWindow()
@@ -288,7 +313,6 @@ bool GMainWindow::LoadROM(const std::string& filename) {
     Loader::ResultStatus result = app_loader->Load();
     if (Loader::ResultStatus::Success != result) {
         LOG_CRITICAL(Frontend, "Failed to load ROM!");
-        System::Shutdown();
 
         switch (result) {
         case Loader::ResultStatus::ErrorEncrypted: {
@@ -325,9 +349,11 @@ void GMainWindow::BootGame(const std::string& filename) {
     if (!InitializeSystem())
         return;
 
-    if (!LoadROM(filename))
-        return;
-
+    if (!LoadROM(filename)) {
+        System::Shutdown();
+          return;
+    }
+	
     // Create and start the emulation thread
     emu_thread = std::make_unique<EmuThread>(render_window);
     emit EmulationStarting(emu_thread.get());

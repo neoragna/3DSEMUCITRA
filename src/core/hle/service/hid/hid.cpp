@@ -17,7 +17,7 @@
 #include "core/core_timing.h"
 #include "core/hle/kernel/event.h"
 #include "core/hle/kernel/shared_memory.h"
-
+#include "core/hle/shared_page.h"
 #include "video_core/video_core.h"
 
 namespace Service {
@@ -69,6 +69,8 @@ static PadState GetCirclePadDirectionState(s16 circle_pad_x, s16 circle_pad_y) {
 }
 
 void Update() {
+    SharedPage::shared_page.sliderstate_3d = VideoCore::g_emu_window->GetDepthSliderValue();
+
     SharedMem* mem = reinterpret_cast<SharedMem*>(shared_mem->GetPointer());
 
     if (mem == nullptr) {
