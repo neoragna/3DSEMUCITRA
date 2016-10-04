@@ -4190,18 +4190,20 @@ unsigned InterpreterMainLoop(ARMul_State* cpu) {
             uxtab_inst* const inst_cream = (uxtab_inst*)inst_base->component;
 
             const u8 rn_idx = inst_cream->Rn;
-            const u32 rm_val = RM;
             const u32 rotation = inst_cream->rotate * 8;
-            const u32 rotated_rm = ((rm_val << (32 - rotation)) | (rm_val >> rotation));
+            u32 rm_val = RM;
+
+            if (rotation)
+                rm_val = ((rm_val << (32 - rotation)) | (rm_val >> rotation));
 
             // UXTB16, otherwise UXTAB16
             if (rn_idx == 15) {
-                RD = rotated_rm & 0x00FF00FF;
+                RD = rm_val & 0x00FF00FF;
             } else {
                 const u32 rn_val = RN;
-                const u8 lo_rotated = (rotated_rm & 0xFF);
+                const u8 lo_rotated = (rm_val & 0xFF);
                 const u16 lo_result = (rn_val & 0xFFFF) + (u16)lo_rotated;
-                const u8 hi_rotated = (rotated_rm >> 16) & 0xFF;
+                const u8 hi_rotated = (rm_val >> 16) & 0xFF;
                 const u16 hi_result = (rn_val >> 16) + (u16)hi_rotated;
 
                 RD = ((hi_result << 16) | (lo_result & 0xFFFF));
