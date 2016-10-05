@@ -68,6 +68,9 @@ protected:
     std::shared_ptr<std::vector<u8>> heap_memory; ///< Heap memory for this Applet
 };
 
+//Return the registered applet count
+u32 GetRegisteredAppletCount();
+
 /// Returns whether a library applet is currently running
 bool IsLibraryAppletRunning();
 
