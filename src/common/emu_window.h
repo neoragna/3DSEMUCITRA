@@ -104,8 +104,8 @@ public:
      * Signal that a 3d depth slider change has occurred
      * @param value new value for 3d depth slider;
      */
+	 
     void DepthSliderChanged(float value);
-
     void StereoscopicModeChanged(StereoscopicMode mode);
 
     /**
@@ -136,7 +136,7 @@ public:
      *   1 unit of return value = (1/coef) deg/sec,
      *   where coef is the return value of GetGyroscopeRawToDpsCoefficient().
      * @note This should be called by the core emu thread to get a state set by the window thread.
-     * @todo Implement gyroscope input in front-end.
+     * @todo Fix this function to be thread-safe.
      * @return std::tuple of (x, y, z)
      */
     std::tuple<s16, s16, s16> GetGyroscopeState() {

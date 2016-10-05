@@ -27,18 +27,24 @@
 
 void EmuWindow_SDL2::OnMouseMotion(s32 x, s32 y) {
     TouchMoved((unsigned)std::max(x, 0), (unsigned)std::max(y, 0));
+	motion_emu->Tilt(x, y);
 }
 
 void EmuWindow_SDL2::OnMouseButton(u32 button, u8 state, s32 x, s32 y) {
-    if (button != SDL_BUTTON_LEFT)
-        return;
-
-    if (state == SDL_PRESSED) {
-        TouchPressed((unsigned)std::max(x, 0), (unsigned)std::max(y, 0));
-    } else {
-        TouchReleased();
-    }
-}
+    if (button == SDL_BUTTON_LEFT) {
+        if (state == SDL_PRESSED) {
+            TouchPressed((unsigned)std::max(x, 0), (unsigned)std::max(y, 0));
+        } else {
+            TouchReleased();
+        }
+    } else if (button == SDL_BUTTON_RIGHT) {
+        if (state == SDL_PRESSED) {
+            motion_emu->BeginTilt(x, y);
+        } else {
+            motion_emu->EndTilt();
+        }
+     }
+ }
 
 void EmuWindow_SDL2::OnKeyEvent(SDL_Keysym key, u8 state) {
     auto keyboard = InputCore::GetKeyboard();
@@ -63,6 +69,7 @@ void EmuWindow_SDL2::OnResize() {
 
 EmuWindow_SDL2::EmuWindow_SDL2() {
     keyboard_id = 0;
+	motion_emu = std::make_unique<Motion::MotionEmu>(*this);
 
     SDL_SetMainReady();
 
@@ -117,6 +124,7 @@ EmuWindow_SDL2::EmuWindow_SDL2() {
 EmuWindow_SDL2::~EmuWindow_SDL2() {
     SDL_GL_DeleteContext(gl_context);
     SDL_Quit();
+	motion_emu = nullptr;
 }
 
 void EmuWindow_SDL2::SwapBuffers() {
