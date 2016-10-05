@@ -13,6 +13,7 @@
 #include "core/hle/service/fs/archive.h"
 #include "core/hle/service/fs/fs_user.h"
 #include "core/settings.h"
+#include "core/hle/service/service_wrapper.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Namespace FS_User
@@ -29,12 +30,8 @@ static ArchiveHandle MakeArchiveHandle(u32 low_word, u32 high_word) {
     return (u64)low_word | ((u64)high_word << 32);
 }
 
-static void Initialize(Service::Interface* self) {
-    u32* cmd_buff = Kernel::GetCommandBuffer();
-
-    // TODO(Link Mauve): check the behavior when cmd_buff[1] isn't 32, as per
-    // http://3dbrew.org/wiki/FS:Initialize#Request
-    cmd_buff[1] = RESULT_SUCCESS.raw;
+static void Initialize(const IPC::CallingPidParam& pid) {
+    IPC::Return(RESULT_SUCCESS.raw);
 }
 
 /**
@@ -53,26 +50,24 @@ static void Initialize(Service::Interface* self) {
  *      1 : Result of function, 0 on success, otherwise error code
  *      3 : File handle
  */
-static void OpenFile(Service::Interface* self) {
-    u32* cmd_buff = Kernel::GetCommandBuffer();
+static void OpenFile(
+        u32 transaction,
+        const ArchiveHandle& archive_handle,
+        FileSys::LowPathType filename_type,
+        u32 filename_size,
+        u32 mode_hex,
+        u32 attributes,  // TODO(Link Mauve): do something with those attributes.
+        const IPC::StaticBufferParam& filename
+    ) {
+    FileSys::Mode mode; mode.hex = mode_hex;
+    FileSys::Path file_path(filename_type, filename_size, filename.data.data());
 
-    ArchiveHandle archive_handle = MakeArchiveHandle(cmd_buff[2], cmd_buff[3]);
-    auto filename_type    = static_cast<FileSys::LowPathType>(cmd_buff[4]);
-    u32 filename_size     = cmd_buff[5];
-    FileSys::Mode mode; mode.hex = cmd_buff[6];
-    u32 attributes        = cmd_buff[7]; // TODO(Link Mauve): do something with those attributes.
-    u32 filename_ptr      = cmd_buff[9];
-    FileSys::Path file_path(filename_type, filename_size, filename_ptr);
-
+	ResultVal<SharedPtr<File>> file_res = OpenFileFromArchive(archive_handle, file_path, mode);
     LOG_DEBUG(Service_FS, "path=%s, mode=%d attrs=%u", file_path.DebugStr().c_str(), mode.hex, attributes);
-
-    ResultVal<SharedPtr<File>> file_res = OpenFileFromArchive(archive_handle, file_path, mode);
-    cmd_buff[1] = file_res.Code().raw;
-    if (file_res.Succeeded()) {
-        cmd_buff[3] = Kernel::g_handle_table.Create(*file_res).MoveFrom();
-    } else {
-        cmd_buff[3] = 0;
-        LOG_ERROR(Service_FS, "failed to get a handle for file %s", file_path.DebugStr().c_str());
+     if (file_res.Succeeded()) {
+        IPC::Return(file_res.Code().raw, IPC::HandleParam{false, {Kernel::g_handle_table.Create(*file_res).MoveFrom()}});
+     } else {
+        IPC::Return(file_res.Code().raw, IPC::HandleParam{false, {0}});
     }
 }
 
@@ -95,21 +90,22 @@ static void OpenFile(Service::Interface* self) {
  *      1 : Result of function, 0 on success, otherwise error code
  *      3 : File handle
  */
-static void OpenFileDirectly(Service::Interface* self) {
-    u32* cmd_buff = Kernel::GetCommandBuffer();
-
-    auto archive_id       = static_cast<FS::ArchiveIdCode>(cmd_buff[2]);
-    auto archivename_type = static_cast<FileSys::LowPathType>(cmd_buff[3]);
-    u32 archivename_size  = cmd_buff[4];
-    auto filename_type    = static_cast<FileSys::LowPathType>(cmd_buff[5]);
-    u32 filename_size     = cmd_buff[6];
-    FileSys::Mode mode; mode.hex = cmd_buff[7];
-    u32 attributes        = cmd_buff[8]; // TODO(Link Mauve): do something with those attributes.
-    u32 archivename_ptr   = cmd_buff[10];
-    u32 filename_ptr      = cmd_buff[12];
-    FileSys::Path archive_path(archivename_type, archivename_size, archivename_ptr);
-    FileSys::Path file_path(filename_type, filename_size, filename_ptr);
-
+static void OpenFileDirectly(
+        u32 transaction,
+        FS::ArchiveIdCode archive_id,
+        FileSys::LowPathType archivename_type,
+        u32 archivename_size,
+        FileSys::LowPathType filename_type,
+        u32 filename_size,
+        u32 mode_hex,
+        u32 attributes,
+        const IPC::StaticBufferParam& archivename,
+        const IPC::StaticBufferParam& filename
+    ) {
+    FileSys::Mode mode; mode.hex = mode_hex;
+    FileSys::Path archive_path(archivename_type, archivename_size, archivename.data.data());
+    FileSys::Path file_path(filename_type, filename_size, filename.data.data());
+	
     LOG_DEBUG(Service_FS, "archive_id=0x%08X archive_path=%s file_path=%s, mode=%u attributes=%d",
               archive_id, archive_path.DebugStr().c_str(), file_path.DebugStr().c_str(), mode.hex, attributes);
 
@@ -117,20 +113,18 @@ static void OpenFileDirectly(Service::Interface* self) {
     if (archive_handle.Failed()) {
         LOG_ERROR(Service_FS, "failed to get a handle for archive archive_id=0x%08X archive_path=%s",
                   archive_id, archive_path.DebugStr().c_str());
-        cmd_buff[1] = archive_handle.Code().raw;
-        cmd_buff[3] = 0;
+        IPC::Return(archive_handle.Code().raw, IPC::HandleParam{false, {0}});
         return;
     }
     SCOPE_EXIT({ CloseArchive(*archive_handle); });
 
     ResultVal<SharedPtr<File>> file_res = OpenFileFromArchive(*archive_handle, file_path, mode);
-    cmd_buff[1] = file_res.Code().raw;
-    if (file_res.Succeeded()) {
-        cmd_buff[3] = Kernel::g_handle_table.Create(*file_res).MoveFrom();
-    } else {
-        cmd_buff[3] = 0;
-        LOG_ERROR(Service_FS, "failed to get a handle for file %s mode=%u attributes=%d",
-                  file_path.DebugStr().c_str(), mode.hex, attributes);
+     if (file_res.Succeeded()) {
+        IPC::Return(file_res.Code().raw, IPC::HandleParam{false, {Kernel::g_handle_table.Create(*file_res).MoveFrom()}});
+     } else {
+        IPC::Return(file_res.Code().raw, IPC::HandleParam{false, {0}});
+         LOG_ERROR(Service_FS, "failed to get a handle for file %s mode=%u attributes=%d",
+                   file_path.DebugStr().c_str(), mode.hex, attributes);
     }
 }
 
@@ -836,9 +830,9 @@ static void GetFormatInfo(Service::Interface* self) {
 const Interface::FunctionInfo FunctionTable[] = {
     {0x000100C6, nullptr,                  "Dummy1"},
     {0x040100C4, nullptr,                  "Control"},
-    {0x08010002, Initialize,               "Initialize"},
-    {0x080201C2, OpenFile,                 "OpenFile"},
-    {0x08030204, OpenFileDirectly,         "OpenFileDirectly"},
+    {0x08010002, IPC::Wrap<decltype(Initialize)>::F<Initialize>, "Initialize"},
+    {0x080201C2, IPC::Wrap<decltype(OpenFile)>::F<OpenFile>, "OpenFile"},
+    {0x08030204, IPC::Wrap<decltype(OpenFileDirectly)>::F<OpenFileDirectly>, "OpenFileDirectly"},
     {0x08040142, DeleteFile,               "DeleteFile"},
     {0x08050244, RenameFile,               "RenameFile"},
     {0x08060142, DeleteDirectory,          "DeleteDirectory"},

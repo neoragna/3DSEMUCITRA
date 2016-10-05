@@ -43,6 +43,7 @@ public:
     Path(const char* path) : type(Char), string(path) {}
     Path(std::vector<u8> binary_data) : type(Binary), binary(std::move(binary_data)) {}
     Path(LowPathType type, u32 size, u32 pointer);
+	Path(LowPathType type, u32 size, const u8* pointer);
 
     LowPathType GetType() const { return type; }
 
