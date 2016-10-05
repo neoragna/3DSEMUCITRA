@@ -155,6 +155,7 @@ struct Values {
 
     // Audio
     std::string sink_id;
+    std::string audio_device_id;
     bool enable_audio_stretching;
 
     // Debugging

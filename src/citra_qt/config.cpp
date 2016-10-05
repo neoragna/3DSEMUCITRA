@@ -63,7 +63,8 @@ void Config::ReadValues() {
 
     qt_config->beginGroup("Audio");
     Settings::values.sink_id = qt_config->value("output_engine", "auto").toString().toStdString();
-    Settings::values.enable_audio_stretching = qt_config->value("enable_audio_stretching", true).toBool();
+	Settings::values.audio_device_id = qt_config->value("output_device", "auto").toString().toStdString();
+	Settings::values.enable_audio_stretching = qt_config->value("enable_audio_stretching", true).toBool();
     qt_config->endGroup();
 
     qt_config->beginGroup("Data Storage");
@@ -164,7 +165,8 @@ void Config::SaveValues() {
 
     qt_config->beginGroup("Audio");
     qt_config->setValue("output_engine", QString::fromStdString(Settings::values.sink_id));
-    qt_config->setValue("enable_audio_stretching", Settings::values.enable_audio_stretching);
+	qt_config->setValue("output_device", QString::fromStdString(Settings::values.audio_device_id));
+    qt_config->setValue("enable_audio_stretching", (Settings::values.enable_audio_stretching));
     qt_config->endGroup();
 
     qt_config->beginGroup("Data Storage");
