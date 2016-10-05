@@ -39,7 +39,7 @@ SDL2Sink::SDL2Sink() : impl(std::make_unique<Impl>()) {
     desired_audiospec.format = AUDIO_S16;
     desired_audiospec.channels = 2;
     desired_audiospec.freq = native_sample_rate;
-    desired_audiospec.samples = 1024;
+    desired_audiospec.samples = 256;
     desired_audiospec.userdata = impl.get();
     desired_audiospec.callback = &Impl::Callback;
 
