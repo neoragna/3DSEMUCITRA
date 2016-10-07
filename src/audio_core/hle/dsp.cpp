@@ -105,7 +105,7 @@ static void OutputCurrentFrame(const StereoFrame16& frame) {
         std::vector<s16> stretched_samples = time_stretcher.Process(sink->SamplesInQueue());
         sink->EnqueueSamples(stretched_samples.data(), stretched_samples.size() / 2);
     } else {
-        constexpr size_t maximum_sample_latency = 4096; // about 512 miliseconds
+        constexpr size_t maximum_sample_latency = 512; // about ? miliseconds
         if (sink->SamplesInQueue() > maximum_sample_latency) {
             // This can occur if we're running too fast and samples are starting to back up.
             // Just drop the samples.
