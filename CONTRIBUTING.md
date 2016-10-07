@@ -3,6 +3,11 @@
 **The issue tracker is not a support forum.** Unless you can provide precise *technical information* regarding an issue, you *should not post in it*. If you need support, first read the [FAQ](https://github.com/citra-emu/citra/wiki/FAQ) and then either visit our IRC channel or ask in a general emulation forum such as [/r/emulation](https://www.reddit.com/r/emulation/). If you post support questions, generic messages to the developers or vague reports without technical details, they will be closed and locked.
 
 If you believe you have a valid issue report, please post text or a screenshot from the log (the console window that opens alongside Citra) and build version (hex string visible in the titlebar and zip filename), as well as your hardware and software information if applicable.
+Please don't report multiple problems per issue and create one issue for each individual problem / game.
+If there are any apparent relations between issues you can use the github reference system (By prefixing other issues and pull requests using '#').
+The title should describe what kind of problem you are experiencing ("missing 3D graphics", "broken 3D colors", "2D graphics broken", "crashes randomly during gameplay", "freeze on save", ...).
+Also include the game in the title (if applicable) so people know wether they even have the game to test it.
+If you have assumptions (such as warnings / errors from the log) about possible causes this should be mentioned in the issue body / discussion, not the title.
 
 While issues about specific games not booting are valid bugs, we are currently not interested in them unless you have several games which fail with the same or similar messages. (In which case please file only a single issue about it.) There are too many non-working games right now to file individual issues for every one of them.
 
