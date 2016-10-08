@@ -5,6 +5,7 @@
 #include "common/common_types.h"
 #include "common/logging/log.h"
 
+#include "core/hw/camera.h"
 #include "core/hw/hw.h"
 #include "core/hw/gpu.h"
 #include "core/hw/lcd.h"
@@ -87,6 +88,7 @@ void Update() {
 
 /// Initialize hardware
 void Init() {
+	Camera::Init();
     GPU::Init();
     LCD::Init();
     LOG_DEBUG(HW, "initialized OK");
@@ -94,6 +96,7 @@ void Init() {
 
 /// Shutdown hardware
 void Shutdown() {
+	Camera::Shutdown();
     GPU::Shutdown();
     LCD::Shutdown();
     LOG_DEBUG(HW, "shutdown OK");
