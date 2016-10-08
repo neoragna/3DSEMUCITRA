@@ -6,7 +6,6 @@
 
 #include "common/common_types.h"
 
-#include "core/hle/kernel/event.h"
 #include "core/hle/kernel/kernel.h"
 
 namespace Kernel {

@@ -56,6 +56,12 @@ enum {
     DEFAULT_STACK_SIZE  = 0x4000,
 };
 
+enum class ResetType {
+    OneShot,
+    Sticky,
+    Pulse,
+};
+
 class Object : NonCopyable {
 public:
     virtual ~Object() {}
@@ -146,6 +152,9 @@ public:
 
     /// Wake up all threads waiting on this object
     void WakeupAllWaitingThreads();
+	
+    /// Get a const reference to the waiting threads list for debug use
+    const std::vector<SharedPtr<Thread>>& GetWaitingThreads() const;
 
 private:
     /// Threads waiting for this object to become available

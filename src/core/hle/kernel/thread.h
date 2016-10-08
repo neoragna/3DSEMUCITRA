@@ -226,4 +226,9 @@ void ThreadingInit();
  */
 void ThreadingShutdown();
 
+/**
+ * Get a const reference to the thread list for debug use
+ */
+const std::vector<SharedPtr<Thread>>& GetThreadList();
+
 } // namespace

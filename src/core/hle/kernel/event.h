@@ -10,13 +10,6 @@
 
 namespace Kernel {
 
-enum class ResetType {
-    OneShot,
-    Sticky,
-    Pulse,
-};
-
-
 class Event final : public WaitObject {
 public:
     /**
