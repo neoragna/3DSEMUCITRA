@@ -71,6 +71,7 @@ set(SRCS
             hle/service/cam/cam_q.cpp
             hle/service/cam/cam_s.cpp
             hle/service/cam/cam_u.cpp
+			hle/service/cam/impl.h
             hle/service/cecd/cecd.cpp
             hle/service/cecd/cecd_s.cpp
             hle/service/cecd/cecd_u.cpp
@@ -295,6 +296,12 @@ set(HEADERS
             system.h
             )
 
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    set(SRCS ${SRCS} hle/service/cam/impl_linux.cpp)
+else()
+    set(SRCS ${SRCS} hle/service/cam/impl_dummy.cpp)
+endif()
+	
 include_directories(../../externals/dynarmic/include)
 
 create_directory_groups(${SRCS} ${HEADERS})

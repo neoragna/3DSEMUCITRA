@@ -5,11 +5,13 @@
 #include "common/logging/log.h"
 
 #include "core/hle/kernel/event.h"
+#include "core/hle/result.h"
 #include "core/hle/service/cam/cam.h"
 #include "core/hle/service/cam/cam_c.h"
 #include "core/hle/service/cam/cam_q.h"
 #include "core/hle/service/cam/cam_s.h"
 #include "core/hle/service/cam/cam_u.h"
+#include "core/hle/service/cam/impl.h"
 #include "core/hle/service/service.h"
 #include "core/hle/service/y2r_u.h"
 
@@ -23,10 +25,13 @@ void StartCapture(Service::Interface* self) {
 
     u8 port = cmd_buff[1] & 0xFF;
 
+	ResultCode result = StartCapture(port);
+	
     cmd_buff[0] = IPC::MakeHeader(0x1, 1, 0);
     cmd_buff[1] = HW::Camera::StartCapture(port).raw;
+	cmd_buff[2] = result.raw;
 
-    LOG_WARNING(Service_CAM, "(STUBBED) called, port=%u", port);
+	LOG_DEBUG(Service_CAM, "called, port=%d", port);
 }
 
 void StopCapture(Service::Interface* self) {
@@ -46,10 +51,13 @@ void IsBusy(Service::Interface* self) {
     u8 port = cmd_buff[1] & 0xFF;
     bool is_busy = false;
 
-    cmd_buff[1] = HW::Camera::IsBusy(port, is_busy).raw;
-    cmd_buff[2] = is_busy;
+    ResultCode result = StopCapture(port);
 
-    LOG_WARNING(Service_CAM, "(STUBBED) called, port=%u", port);
+    cmd_buff[1] = HW::Camera::IsBusy(port, is_busy).raw;
+    cmd_buff[1] = is_busy;
+	cmd_buff[2] = result.raw;
+
+	LOG_DEBUG(Service_CAM, "called, port=%d", port);
 }
 
 void ClearBuffer(Service::Interface* self) {
@@ -99,14 +107,16 @@ void SetReceiving(Service::Interface* self) {
     u16 trans_unit = cmd_buff[4] & 0xFFFF;
     Handle event;
 
-
+	ResultCode result = SetReceiving(dest, port, image_size, trans_unit);
+	
     cmd_buff[0] = IPC::MakeHeader(0x7, 1, 2);
     cmd_buff[1] = HW::Camera::SetReceiving(port, dest, image_size, trans_unit, event).raw;
     cmd_buff[2] = IPC::MoveHandleDesc();
     cmd_buff[3] = event;
+	cmd_buff[4] = result.raw;
 
-    LOG_WARNING(Service_CAM, "(STUBBED) called, addr=0x%X, port=%u, image_size=%u, trans_unit=%u",
-                dest, port, image_size, trans_unit);
+	LOG_DEBUG(Service_CAM, "called, addr=0x%X, port=%d, image_size=%d, trans_unit=%d",
+    dest, port, image_size, trans_unit);
 }
 
 void SetTransferLines(Service::Interface* self) {
@@ -209,15 +219,16 @@ void SetTrimmingParamsCenter(Service::Interface* self) {
 }
 
 void Activate(Service::Interface* self) {
-    u32* cmd_buff = Kernel::GetCommandBuffer();
+	u32* cmd_buff = Kernel::GetCommandBuffer();
 
-    u8 camera_select = cmd_buff[1] & 0xFF;
+	u8 camera_select = cmd_buff[1] & 0xFF;
 
-    cmd_buff[0] = IPC::MakeHeader(0x13, 1, 0);
-    cmd_buff[1] = HW::Camera::Activate(camera_select).raw;
+	cmd_buff[0] = IPC::MakeHeader(0x13, 1, 0);
+	cmd_buff[1] = HW::Camera::Activate(camera_select).raw;
 
-    LOG_WARNING(Service_CAM, "(STUBBED) called, cam_select=%u", camera_select);
+	LOG_WARNING(Service_CAM, "(STUBBED) called, cam_select=%u", camera_select);
 }
+
 
 void FlipImage(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
@@ -258,11 +269,13 @@ void SetSize(Service::Interface* self) {
     u8 size       = cmd_buff[2] & 0xFF;
     u8 context    = cmd_buff[3] & 0xFF;
 
+	ResultCode result = SetSize(cam_select, size, context);
+	
     cmd_buff[0] = IPC::MakeHeader(0x1F, 1, 0);
     cmd_buff[1] = HW::Camera::SetSize(cam_select, size, context).raw;
+	cmd_buff[2] = result.raw;
 
-    LOG_WARNING(Service_CAM, "(STUBBED) called, cam_select=%u, size=%u, context=%u",
-                cam_select, size, context);
+	LOG_DEBUG(Service_CAM, "called, cam_select=%d, size=%d, context=%d", cam_select, size, context);
 }
 
 void SetFrameRate(Service::Interface* self) {
@@ -276,6 +289,22 @@ void SetFrameRate(Service::Interface* self) {
 
     LOG_WARNING(Service_CAM, "(STUBBED) called, cam_select=%d, frame_rate=%d",
                 cam_select, frame_rate);
+}
+
+void SetOutputFormat(Service::Interface* self) {
+	u32* cmd_buff = Kernel::GetCommandBuffer();
+	
+		u8 cam_select = cmd_buff[1] & 0xFF;
+	u8 output_format = cmd_buff[2] & 0xFF;
+	u8 context = cmd_buff[3] & 0xFF;
+	
+		ResultCode result = SetOutputFormat(cam_select, output_format, context);
+	
+		cmd_buff[0] = IPC::MakeHeader(0x25, 3, 0);
+	cmd_buff[1] = result.raw;
+	
+		LOG_DEBUG(Service_CAM, "called, cam_select=%d, output_format=%d, context=%d",
+		+cam_select, output_format, context);
 }
 
 void GetStereoCameraCalibrationData(Service::Interface* self) {
@@ -302,7 +331,7 @@ void GetStereoCameraCalibrationData(Service::Interface* self) {
     cmd_buff[1] = RESULT_SUCCESS.raw;
     memcpy(&cmd_buff[2], &data, sizeof(data));
 
-    LOG_TRACE(Service_CAM, "called");
+	LOG_DEBUG(Service_CAM, "called");
 }
 
 void GetSuitableY2rStandardCoefficient(Service::Interface* self) {
@@ -329,19 +358,25 @@ void PlayShutterSound(Service::Interface* self) {
 void DriverInitialize(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
 
+	ResultCode result = DriverInitialize();
+	
     cmd_buff[0] = IPC::MakeHeader(0x39, 1, 0);
     cmd_buff[1] = HW::Camera::DriverInitialize().raw;
+	cmd_buff[2] = result.raw;
 
-    LOG_WARNING(Service_CAM, "(STUBBED) called");
+	LOG_DEBUG(Service_CAM, "called");
 }
 
 void DriverFinalize(Service::Interface* self) {
     u32* cmd_buff = Kernel::GetCommandBuffer();
 
+	ResultCode result = DriverFinalize();
+	
     cmd_buff[0] = IPC::MakeHeader(0x3A, 1, 0);
     cmd_buff[1] = HW::Camera::DriverFinalize().raw;
+	cmd_buff[2] = result.raw;
 
-    LOG_WARNING(Service_CAM, "(STUBBED) called");
+	LOG_DEBUG(Service_CAM, "called");
 }
 
 void Init() {
@@ -355,7 +390,9 @@ void Init() {
 }
 
 void Shutdown() {
+
 }
 
 } // namespace CAM
+
 } // namespace Service
