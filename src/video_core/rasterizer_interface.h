@@ -42,8 +42,13 @@ public:
     /// Notify rasterizer that any caches of the specified region should be flushed to 3DS memory and invalidated
     virtual void FlushAndInvalidateRegion(PAddr addr, u32 size) = 0;
 
-    /// Attempt to use a faster method to perform a display transfer
+    // Attempt to use a faster method to perform a display transfer with is_texture_copy = 0
     virtual bool AccelerateDisplayTransfer(const GPU::Regs::DisplayTransferConfig& config) { return false; }
+	
+    /// Attempt to use a faster method to perform a display transfer with is_texture_copy = 1
+    virtual bool AccelerateTextureCopy(const GPU::Regs::DisplayTransferConfig& config) {
+        return false;
+    }
 
     /// Attempt to use a faster method to fill a region
     virtual bool AccelerateFill(const GPU::Regs::MemoryFillConfig& config) { return false; }
