@@ -12,6 +12,7 @@
 #include "common/common_paths.h"
 #include "common/logging/log.h"
 #include "common/string_util.h"
+#include "core/memory.h"
 
 #ifdef _MSC_VER
     #include <Windows.h>
@@ -22,6 +23,29 @@
 #endif
 
 namespace Common {
+	
+	void Dump(u32 addr, u32 size) {
+    std::ostringstream oss, text;
+    u32 hex_count = 0;
+    for (u32 i = 0; i < size; ++i) {
+        u8 c = Memory::Read8(addr + i);
+        oss << Common::StringFromFormat("%02x ", c);
+        if (c >= 0x20 && c <0x80) {
+            text << c;
+        }
+        else {
+            text << '.';
+        }
+        if (++hex_count == 0x10) {
+            LOG_WARNING(Common, "%s: %s", oss.str().c_str(), text.str().c_str());
+            hex_count = 0;
+            oss.str("");
+            text.str("");
+        }
+    }
+    if (oss.str().length())
+        LOG_WARNING(Common, "%s: %s", oss.str().c_str(), text.str().c_str());
+}
 
 /// Make a string lowercase
 std::string ToLower(std::string str) {

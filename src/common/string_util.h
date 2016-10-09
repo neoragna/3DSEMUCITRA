@@ -18,6 +18,9 @@
 #include "common/common_types.h"
 
 namespace Common {
+	
+/// Dump to log memory region with size
+void Dump(u32 addr, u32 size);
 
 /// Make a string lowercase
 std::string ToLower(std::string str);

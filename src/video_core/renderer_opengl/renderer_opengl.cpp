@@ -506,6 +506,7 @@ static void APIENTRY DebugHandler(GLenum source, GLenum type, GLuint id, GLenum 
 bool RendererOpenGL::Init() {
     render_window->MakeCurrent();
 
+	GLAD_GL_KHR_debug = 0;
     if (GLAD_GL_KHR_debug) {
 		GLAD_GL_KHR_debug = 0;
         glEnable(GL_DEBUG_OUTPUT);

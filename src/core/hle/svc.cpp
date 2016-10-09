@@ -302,6 +302,10 @@ static ResultCode WaitSynchronizationN(s32* out, Handle* handles, s32 handle_cou
             auto object = Kernel::g_handle_table.GetWaitObject(handles[i]);
             if (object == nullptr)
                 return ERR_INVALID_HANDLE;
+			
+            if (object->GetName() == "IR:ReceiveEvent") {
+                LOG_INFO(Kernel_SVC, " IR:ReceiveEvent should wait: %u", object->ShouldWait());
+            }
 
             // Check if the current thread should wait on this object...
             if (object->ShouldWait()) {

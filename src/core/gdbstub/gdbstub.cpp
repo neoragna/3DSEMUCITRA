@@ -410,7 +410,7 @@ static void HandleQuery() {
 
     if (strcmp(query, "TStatus") == 0 ) {
         SendReply("T0");
-    } else if (strncmp(query, "Supported:", strlen("Supported:")) == 0) {
+    } else if (strncmp(query, "Supported", strlen("Supported")) == 0) {
         // PacketSize needs to be large enough for target xml
         SendReply("PacketSize=800;qXfer:features:read+");
     } else if (strncmp(query, "Xfer:features:read:target.xml:", strlen("Xfer:features:read:target.xml:")) == 0) {

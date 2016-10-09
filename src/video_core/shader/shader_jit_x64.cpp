@@ -73,8 +73,8 @@ const JitFunction instr_table[64] = {
     &JitShader::Compile_IF,         // ifu
     &JitShader::Compile_IF,         // ifc
     &JitShader::Compile_LOOP,       // loop
-    &JitShader::Compile_EMIT,       // emit
-    &JitShader::Compile_SETEMIT,    // setemit
+    nullptr,                        // emit
+    nullptr,                        // sete
     &JitShader::Compile_JMP,        // jmpc
     &JitShader::Compile_JMP,        // jmpu
     &JitShader::Compile_CMP,        // cmp
@@ -94,7 +94,7 @@ const JitFunction instr_table[64] = {
     &JitShader::Compile_MAD,        // mad
     &JitShader::Compile_MAD,        // mad
     &JitShader::Compile_MAD,        // mad
-    &JitShader::Compile_MAD,        // mad
+    &JitShader::Compile_MAD,        // mad        // mad
 };
 
 // The following is used to alias some commonly used registers. Generally, RAX-RDX and XMM0-XMM3 can
@@ -793,7 +793,7 @@ void JitShader::Compile_NextInstr() {
         ((*this).*instr_func)(instr);
     } else {
         // Unhandled instruction
-        LOG_CRITICAL(HW_GPU, "Unhandled instruction: 0x%02x (0x%08x)",
+        LOG_TRACE(HW_GPU, "Unhandled instruction: 0x%02x (0x%08x)",
                 instr.opcode.Value().EffectiveOpCode(), instr.hex);
     }
 }
