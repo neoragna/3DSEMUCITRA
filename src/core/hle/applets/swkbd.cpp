@@ -82,9 +82,7 @@ void SoftwareKeyboard::Update() {
     memcpy(text_memory->GetPointer(), text.c_str(), text.length() * sizeof(char16_t));
 
     // TODO(Subv): Ask for input and write it to the shared memory
-    // TODO(Subv): Find out what are the possible values for the return code,
-    // some games seem to check for a hardcoded 2
-    config.return_code = 2;
+    config.return_code = SwkbdResult::SWKBD_D1_CLICK1;
     config.text_length = 6;
     config.text_offset = 0;
 
