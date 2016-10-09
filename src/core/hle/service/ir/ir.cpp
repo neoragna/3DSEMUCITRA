@@ -185,7 +185,7 @@ void GetSendEvent(Interface* self) {
     cmd_buff[1] = RESULT_SUCCESS.raw;
     cmd_buff[3] = Kernel::g_handle_table.Create(Service::IR::send_event).MoveFrom();
 
-    LOG_WARNING(Service_IR, "(STUBBED) called");
+   LOG_WARNING(Service_IR, "(STUBBED) called");
 }
 
 void GetReceiveEvent(Interface* self) {

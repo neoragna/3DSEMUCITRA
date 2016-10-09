@@ -128,15 +128,14 @@ void GetConnectionStatusEvent(Interface* self);
  *  Outputs:
  *      1 : Result of function, 0 on success, otherwise error code
  */
+ 
 void SendIrNop(Interface* self);
-
 void SendIrNopLarge(Interface* self);
-
 void ReceiveIrnop(Interface* self);
-
 void ReceiveIrnopLarge(Interface* self);
-
 void GetConnectionStatus(Interface* self);
+void GetSendEvent(Interface* self);
+void GetReceiveEvent(Interface* self);
 
 /**
  * IR::Disconnect service function
@@ -172,7 +171,6 @@ void AutoConnection(Interface* self);
  *      1 : Result of function, 0 on success, otherwise error code
  *      3 : Connection Status Event handle
  */
-void GetSendEvent(Interface* self);
 
 /**
  * IR::GetReceiveEvent service function
@@ -180,7 +178,6 @@ void GetSendEvent(Interface* self);
  *      1 : Result of function, 0 on success, otherwise error code
  *      3 : Receive Status Event handle
  */
-void GetReceiveEvent(Interface* self);
 
 void ReleaseReceivedData(Interface* self);
 
