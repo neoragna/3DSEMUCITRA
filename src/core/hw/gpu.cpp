@@ -187,7 +187,15 @@ inline void Write(u32 addr, const T data) {
                     u32 input_gap = config.texture_copy.input_gap * 16;
                     u32 output_width = config.texture_copy.output_width * 16;
                     u32 output_gap = config.texture_copy.output_gap * 16;
-
+										
+                    if (input_width == 0) {
+                         input_width = 1024 * 16;
+                     }
+ 
+                     if (output_width == 0) {
+                         output_width = 1024 * 16;
+                     }
+ 
                     size_t contiguous_input_size = config.texture_copy.size / input_width * (input_width + input_gap);
                     Memory::RasterizerFlushRegion(config.GetPhysicalInputAddress(), static_cast<u32>(contiguous_input_size));
 
