@@ -127,6 +127,7 @@ set(SRCS
             hle/service/y2r_u.cpp
             hle/shared_page.cpp
             hle/svc.cpp
+			hw/camera.cpp
             hw/gpu.cpp
             hw/hw.cpp
             hw/lcd.cpp
@@ -275,6 +276,7 @@ set(HEADERS
             hle/service/y2r_u.h
             hle/shared_page.h
             hle/svc.h
+			hw/camera.h
             hw/gpu.h
             hw/hw.h
             hw/lcd.h
