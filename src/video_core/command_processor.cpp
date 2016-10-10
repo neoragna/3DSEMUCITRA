@@ -418,13 +418,6 @@ static void WritePicaReg(u32 id, u32 value, u32 mask) {
         case PICA_REG_INDEX_WORKAROUND(gs.swizzle_patterns.set_word[7], 0x2ad):
         {
             Shader::WriteSwizzlePatterns(true, value);
-			
-            VideoCore::g_renderer->Rasterizer()->DrawTriangles();
-
-            if (g_debug_context) {
-                g_debug_context->OnEvent(DebugContext::Event::FinishedPrimitiveBatch, nullptr);
-            }
-
             break;
         }
 
