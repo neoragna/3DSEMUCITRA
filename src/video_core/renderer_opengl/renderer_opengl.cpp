@@ -412,29 +412,36 @@ void RendererOpenGL::DrawScreens() {
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(uniform_color_texture, 0);
 	
-    switch (render_window->GetStereoscopicMode()) {
-    case EmuWindow::StereoscopicMode::LeftOnly:
-        DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
-                                (float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
-                                (float)layout.top_screen.GetHeight(), true, true);
-        break;
-    case EmuWindow::StereoscopicMode::RightOnly:
-        DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
-                                (float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
-                                (float)layout.top_screen.GetHeight(), true, true);
-        break;
-    case EmuWindow::StereoscopicMode::Anaglyph:
-        DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
-                                (float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
-                                (float)layout.top_screen.GetHeight(), true, false);
-        DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
-                                (float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
-                                (float)layout.top_screen.GetHeight(), false, true);
-        break;
-    }
-    DrawSingleScreenRotated(screen_infos[2], (float)layout.bottom_screen.left,
-                            (float)layout.bottom_screen.top, (float)layout.bottom_screen.GetWidth(),
-                            (float)layout.bottom_screen.GetHeight(), true, true);
+	switch (render_window->GetStereoscopicMode()) {
+		case EmuWindow::StereoscopicMode::LeftOnly:
+			DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
+				(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+				(float)layout.top_screen.GetHeight(), true, false);
+			DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
+				(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+				(float)layout.top_screen.GetHeight(), false, true);
+			break;
+			case EmuWindow::StereoscopicMode::RightOnly:
+				DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
+					(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+					(float)layout.top_screen.GetHeight(), true, false);
+				DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
+					(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+					(float)layout.top_screen.GetHeight(), false, true);
+			break;
+				case EmuWindow::StereoscopicMode::Anaglyph:
+					DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
+						(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+						(float)layout.top_screen.GetHeight(), true, false);
+					DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
+						(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+						(float)layout.top_screen.GetHeight(), false, true);
+					break;
+					
+	}
+	DrawSingleScreenRotated(screen_infos[2], (float)layout.bottom_screen.left,
+		(float)layout.bottom_screen.top, (float)layout.bottom_screen.GetWidth(),
+	    (float)layout.bottom_screen.GetHeight(), true, true);
 	
     m_current_frame++;
 }
