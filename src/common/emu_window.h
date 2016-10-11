@@ -42,7 +42,7 @@ public:
         std::pair<unsigned,unsigned> min_client_area_size;
     };
 	
-    enum StereoscopicMode { LeftOnly, RightOnly, Anaglyph };
+    enum StereoscopicMode { LeftOnly, RightOnly, Anaglyph, SideBySide };
 
     /**
      * Convenience method to update the VideoCore EmuWindow

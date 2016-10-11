@@ -6,23 +6,19 @@
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
-
 #include <glad/glad.h>
-
 #include "common/assert.h"
 #include "common/bit_field.h"
 #include "common/emu_window.h"
 #include "common/logging/log.h"
 #include "common/profiler_reporting.h"
 #include "common/synchronized_wrapper.h"
-
 #include "core/hw/gpu.h"
 #include "core/hw/hw.h"
 #include "core/hw/lcd.h"
 #include "core/memory.h"
 #include "core/settings.h"
 #include "core/tracer/recorder.h"
-
 #include "video_core/debug_utils/debug_utils.h"
 #include "video_core/rasterizer_interface.h"
 #include "video_core/renderer_opengl/renderer_opengl.h"
@@ -87,24 +83,25 @@ struct ScreenRectVertex {
  * by a 3x2 matrix.
  */
 static std::array<GLfloat, 3 * 2> MakeOrthographicMatrix(const float width, const float height) {
-    std::array<GLfloat, 3 * 2> matrix;
+    std::array<GLfloat, 3 * 2> matrix; // Laid out in column-major order
 
+    // clang-format off
     matrix[0] = 2.f / width; matrix[2] = 0.f;           matrix[4] = -1.f;
     matrix[1] = 0.f;         matrix[3] = -2.f / height; matrix[5] = 1.f;
     // Last matrix row is implicitly assumed to be [0, 0, 1].
+    // clang-format on
 
     return matrix;
 }
 
 /// RendererOpenGL constructor
 RendererOpenGL::RendererOpenGL() {
-    resolution_width  = std::max(VideoCore::kScreenTopWidth, VideoCore::kScreenBottomWidth);
+    resolution_width = std::max(VideoCore::kScreenTopWidth, VideoCore::kScreenBottomWidth);
     resolution_height = VideoCore::kScreenTopHeight + VideoCore::kScreenBottomHeight;
 }
 
 /// RendererOpenGL destructor
-RendererOpenGL::~RendererOpenGL() {
-}
+RendererOpenGL::~RendererOpenGL() {}
 
 /// Swap buffers (render frame)
 void RendererOpenGL::SwapBuffers() {
@@ -116,13 +113,15 @@ void RendererOpenGL::SwapBuffers() {
         const auto& framebuffer = GPU::g_regs.framebuffer_config[i != 2 ? 0 : 1];
 
         // Main LCD (0): 0x1ED02204, Sub LCD (1): 0x1ED02A04
-        u32 lcd_color_addr = (i != 2) ? LCD_REG_INDEX(color_fill_top) : LCD_REG_INDEX(color_fill_bottom);
+        u32 lcd_color_addr =
+            (i != 2) ? LCD_REG_INDEX(color_fill_top) : LCD_REG_INDEX(color_fill_bottom);
         lcd_color_addr = HW::VADDR_LCD + 4 * lcd_color_addr;
         LCD::Regs::ColorFill color_fill = {0};
         LCD::Read(color_fill.raw, lcd_color_addr);
 
         if (color_fill.is_enabled) {
-            LoadColorToActiveGLTexture(color_fill.color_r, color_fill.color_g, color_fill.color_b, screen_infos[i].texture);
+            LoadColorToActiveGLTexture(color_fill.color_r, color_fill.color_g, color_fill.color_b,
+                                       screen_infos[i].texture);
 
             // Resize the texture in case the framebuffer size has changed
             screen_infos[i].texture.width = 1;
@@ -184,9 +183,8 @@ void RendererOpenGL::LoadFBToScreenInfo(const GPU::Regs::FramebufferConfig& fram
     }
 
     LOG_TRACE(Render_OpenGL, "0x%08x bytes from 0x%08x(%dx%d), fmt %x",
-        framebuffer.stride * framebuffer.height,
-        framebuffer_addr, (int)framebuffer.width,
-        (int)framebuffer.height, (int)framebuffer.format);
+              framebuffer.stride * framebuffer.height, framebuffer_addr, (int)framebuffer.width,
+              (int)framebuffer.height, (int)framebuffer.format);
 
     int bpp = GPU::Regs::BytesPerPixel(framebuffer.color_format);
     size_t pixel_stride = framebuffer.stride / bpp;
@@ -198,7 +196,8 @@ void RendererOpenGL::LoadFBToScreenInfo(const GPU::Regs::FramebufferConfig& fram
     // only allows rows to have a memory alignement of 4.
     ASSERT(pixel_stride % 4 == 0);
 
-    if (!Rasterizer()->AccelerateDisplay(framebuffer, framebuffer_addr, static_cast<u32>(pixel_stride), screen_info)) {
+    if (!Rasterizer()->AccelerateDisplay(framebuffer, framebuffer_addr,
+                                         static_cast<u32>(pixel_stride), screen_info)) {
         // Reset the screen info's display texture to its own permanent texture
         screen_info.display_texture = screen_info.texture.resource.handle;
         screen_info.display_texcoords = MathUtil::Rectangle<float>(0.f, 0.f, 1.f, 1.f);
@@ -214,12 +213,13 @@ void RendererOpenGL::LoadFBToScreenInfo(const GPU::Regs::FramebufferConfig& fram
         glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint)pixel_stride);
 
         // Update existing texture
-        // TODO: Test what happens on hardware when you change the framebuffer dimensions so that they
-        //       differ from the LCD resolution.
+        // TODO: Test what happens on hardware when you change the framebuffer dimensions so that
+        //       they differ from the LCD resolution.
         // TODO: Applications could theoretically crash Citra here by specifying too large
         //       framebuffer sizes. We should make sure that this cannot happen.
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, framebuffer.width, framebuffer.height,
-                        screen_info.texture.gl_format, screen_info.texture.gl_type, framebuffer_data);
+                        screen_info.texture.gl_format, screen_info.texture.gl_type,
+                        framebuffer_data);
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
@@ -229,9 +229,8 @@ void RendererOpenGL::LoadFBToScreenInfo(const GPU::Regs::FramebufferConfig& fram
 }
 
 /**
- * Fills active OpenGL texture with the given RGB color.
- * Since the color is solid, the texture can be 1x1 but will stretch across whatever it's rendered on.
- * This has the added benefit of being *really fast*.
+ * Fills active OpenGL texture with the given RGB color. Since the color is solid, the texture can
+ * be 1x1 but will stretch across whatever it's rendered on.
  */
 void RendererOpenGL::LoadColorToActiveGLTexture(u8 color_r, u8 color_g, u8 color_b,
                                                 const TextureInfo& texture) {
@@ -239,7 +238,7 @@ void RendererOpenGL::LoadColorToActiveGLTexture(u8 color_r, u8 color_g, u8 color
     state.Apply();
 
     glActiveTexture(GL_TEXTURE0);
-    u8 framebuffer_data[3] = { color_r, color_g, color_b };
+    u8 framebuffer_data[3] = {color_r, color_g, color_b};
 
     // Update existing texture
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, framebuffer_data);
@@ -252,7 +251,6 @@ void RendererOpenGL::LoadColorToActiveGLTexture(u8 color_r, u8 color_g, u8 color
  * Initializes the OpenGL state and creates persistent objects.
  */
 void RendererOpenGL::InitOpenGLObjects() {
-    glClearColor(Settings::values.bg_red, Settings::values.bg_green, Settings::values.bg_blue, 0.0f);
 
     // Link shaders and get variable locations
     shader.Create(vertex_shader, fragment_shader);
@@ -276,8 +274,10 @@ void RendererOpenGL::InitOpenGLObjects() {
 
     // Attach vertex data to VAO
     glBufferData(GL_ARRAY_BUFFER, sizeof(ScreenRectVertex) * 4, nullptr, GL_STREAM_DRAW);
-    glVertexAttribPointer(attrib_position,  2, GL_FLOAT, GL_FALSE, sizeof(ScreenRectVertex), (GLvoid*)offsetof(ScreenRectVertex, position));
-    glVertexAttribPointer(attrib_tex_coord, 2, GL_FLOAT, GL_FALSE, sizeof(ScreenRectVertex), (GLvoid*)offsetof(ScreenRectVertex, tex_coord));
+    glVertexAttribPointer(attrib_position, 2, GL_FLOAT, GL_FALSE, sizeof(ScreenRectVertex),
+                          (GLvoid*)offsetof(ScreenRectVertex, position));
+    glVertexAttribPointer(attrib_tex_coord, 2, GL_FLOAT, GL_FALSE, sizeof(ScreenRectVertex),
+                          (GLvoid*)offsetof(ScreenRectVertex, tex_coord));
     glEnableVertexAttribArray(attrib_position);
     glEnableVertexAttribArray(attrib_tex_coord);
 
@@ -358,23 +358,25 @@ void RendererOpenGL::ConfigureFramebufferTexture(TextureInfo& texture,
 
     glActiveTexture(GL_TEXTURE0);
     glTexImage2D(GL_TEXTURE_2D, 0, internal_format, texture.width, texture.height, 0,
-            texture.gl_format, texture.gl_type, nullptr);
+                 texture.gl_format, texture.gl_type, nullptr);
 
     state.texture_units[0].texture_2d = 0;
     state.Apply();
 }
 
 /**
- * Draws a single texture to the emulator window, rotating the texture to correct for the 3DS's LCD rotation.
+ * Draws a single texture to the emulator window, rotating the texture to correct for the 3DS's LCD
+ * rotation.
  */
-void RendererOpenGL::DrawSingleScreenRotated(const ScreenInfo& screen_info, float x, float y, float w, float h, bool left, bool right) {
+void RendererOpenGL::DrawSingleScreenRotated(const ScreenInfo& screen_info, float x, float y,
+                                             float w, float h, bool left, bool right) {
     auto& texcoords = screen_info.display_texcoords;
 
     std::array<ScreenRectVertex, 4> vertices = {{
-        ScreenRectVertex(x,   y,   texcoords.bottom, texcoords.left),
-        ScreenRectVertex(x+w, y,   texcoords.bottom, texcoords.right),
-        ScreenRectVertex(x,   y+h, texcoords.top, texcoords.left),
-        ScreenRectVertex(x+w, y+h, texcoords.top, texcoords.right),
+        ScreenRectVertex(x, y, texcoords.bottom, texcoords.left),
+        ScreenRectVertex(x + w, y, texcoords.bottom, texcoords.right),
+        ScreenRectVertex(x, y + h, texcoords.top, texcoords.left),
+        ScreenRectVertex(x + w, y + h, texcoords.top, texcoords.right),
     }};
 
     state.texture_units[0].texture_2d = screen_info.display_texture;
@@ -388,7 +390,7 @@ void RendererOpenGL::DrawSingleScreenRotated(const ScreenInfo& screen_info, floa
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
     state.texture_units[0].texture_2d = 0;
-	state.color_mask = color_mask;
+    state.color_mask = color_mask;
     state.Apply();
 }
 
@@ -397,58 +399,93 @@ void RendererOpenGL::DrawSingleScreenRotated(const ScreenInfo& screen_info, floa
  */
 void RendererOpenGL::DrawScreens() {
     auto layout = render_window->GetFramebufferLayout();
-    auto top_screen = layout.top_screen;
-    auto bottom_screen = layout.bottom_screen;
 
     glViewport(0, 0, layout.width, layout.height);
+    glClearColor(Settings::values.bg_red, Settings::values.bg_green, Settings::values.bg_blue,
+                 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Set projection matrix
-    std::array<GLfloat, 3 * 2> ortho_matrix = MakeOrthographicMatrix((float)layout.width,
-        (float)layout.height);
+    std::array<GLfloat, 3 * 2> ortho_matrix =
+        MakeOrthographicMatrix((float)layout.width, (float)layout.height);
     glUniformMatrix3x2fv(uniform_modelview_matrix, 1, GL_FALSE, ortho_matrix.data());
 
     // Bind texture in Texture Unit 0
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(uniform_color_texture, 0);
-	
+
 	switch (render_window->GetStereoscopicMode()) {
-		case EmuWindow::StereoscopicMode::LeftOnly:
-			DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
-				(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+	case EmuWindow::StereoscopicMode::LeftOnly:
+		DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
+			(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+			(float)layout.top_screen.GetHeight(), true, false);
+		DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
+			(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+			(float)layout.top_screen.GetHeight(), false, true);
+		break;
+	case EmuWindow::StereoscopicMode::RightOnly:
+		DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
+			(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+			(float)layout.top_screen.GetHeight(), true, false);
+		DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
+			(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+			(float)layout.top_screen.GetHeight(), false, true);
+		break;
+	case EmuWindow::StereoscopicMode::Anaglyph:
+		DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
+			(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+			(float)layout.top_screen.GetHeight(), true, false);
+		DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
+			(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+			(float)layout.top_screen.GetHeight(), false, true);
+		break;
+	case EmuWindow::StereoscopicMode::SideBySide:
+		float l = (float)layout.top_screen.left / 1.5f;
+		float w = (float)layout.top_screen.GetWidth() / 1.5f;
+		DrawSingleScreenRotated(screen_infos[0], l,
+			(float)layout.top_screen.top, w,
+			(float)layout.top_screen.GetHeight(), true, false);
+		DrawSingleScreenRotated(screen_infos[1], l,
+			(float)layout.top_screen.top, w,
+			(float)layout.top_screen.GetHeight(), false, true);
+			DrawSingleScreenRotated(screen_infos[1], (float)layout.width / 3.0f + l,
+				(float)layout.top_screen.top, w,
 				(float)layout.top_screen.GetHeight(), true, false);
-			DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
-				(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
+			DrawSingleScreenRotated(screen_infos[0], (float)layout.width / 3.0f + l,
+				(float)layout.top_screen.top, w,
 				(float)layout.top_screen.GetHeight(), false, true);
 			break;
-			case EmuWindow::StereoscopicMode::RightOnly:
-				DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
-					(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
-					(float)layout.top_screen.GetHeight(), true, false);
-				DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
-					(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
-					(float)layout.top_screen.GetHeight(), false, true);
-			break;
-				case EmuWindow::StereoscopicMode::Anaglyph:
-					DrawSingleScreenRotated(screen_infos[0], (float)layout.top_screen.left,
-						(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
-						(float)layout.top_screen.GetHeight(), true, false);
-					DrawSingleScreenRotated(screen_infos[1], (float)layout.top_screen.left,
-						(float)layout.top_screen.top, (float)layout.top_screen.GetWidth(),
-						(float)layout.top_screen.GetHeight(), false, true);
-					break;
-					
 	}
-	DrawSingleScreenRotated(screen_infos[2], (float)layout.bottom_screen.left,
-		(float)layout.bottom_screen.top, (float)layout.bottom_screen.GetWidth(),
-	    (float)layout.bottom_screen.GetHeight(), true, true);
-	
-    m_current_frame++;
+	// Draw bottom screen
+	switch (render_window->GetStereoscopicMode()) {
+	case EmuWindow::StereoscopicMode::LeftOnly:
+	case EmuWindow::StereoscopicMode::RightOnly:
+	case EmuWindow::StereoscopicMode::Anaglyph:
+		DrawSingleScreenRotated(screen_infos[2], (float)layout.bottom_screen.left,
+			(float)layout.bottom_screen.top, (float)layout.bottom_screen.GetWidth(),
+			(float)layout.bottom_screen.GetHeight(), true, true);
+		break;
+	case EmuWindow::StereoscopicMode::SideBySide:
+		// For side by side we duplicate the image so it appears 2D on a 3D display
+		float l = (float)layout.bottom_screen.left / 1.5f;
+		float w = (float)layout.bottom_screen.GetWidth() / 1.5f;
+		DrawSingleScreenRotated(screen_infos[2], l,
+			(float)layout.bottom_screen.top, w,
+			(float)layout.bottom_screen.GetHeight(), true, true);
+		DrawSingleScreenRotated(screen_infos[2], (float)layout.width / 3.0f + l,
+			(float)layout.bottom_screen.top, w,
+			(float)layout.bottom_screen.GetHeight(), true, true);
+		// Draw some cursor for touch
+		auto x = (float)(float)VideoCore::kScreenBottomWidth * w + l;
+		auto y = layout.bottom_screen.top -
+			(float)(float)VideoCore::kScreenBottomHeight *
+			(float)layout.bottom_screen.GetHeight();
+	}
+	m_current_frame++;
 }
 
 /// Updates the framerate
-void RendererOpenGL::UpdateFramerate() {
-}
+void RendererOpenGL::UpdateFramerate() {}
 
 /**
  * Set the emulator window to use for renderer
@@ -459,14 +496,16 @@ void RendererOpenGL::SetWindow(EmuWindow* window) {
 }
 
 static const char* GetSource(GLenum source) {
-#define RET(s) case GL_DEBUG_SOURCE_##s: return #s
+#define RET(s)                                                                                     \
+    case GL_DEBUG_SOURCE_##s:                                                                      \
+        return #s
     switch (source) {
-    RET(API);
-    RET(WINDOW_SYSTEM);
-    RET(SHADER_COMPILER);
-    RET(THIRD_PARTY);
-    RET(APPLICATION);
-    RET(OTHER);
+        RET(API);
+        RET(WINDOW_SYSTEM);
+        RET(SHADER_COMPILER);
+        RET(THIRD_PARTY);
+        RET(APPLICATION);
+        RET(OTHER);
     default:
         UNREACHABLE();
     }
@@ -474,23 +513,25 @@ static const char* GetSource(GLenum source) {
 }
 
 static const char* GetType(GLenum type) {
-#define RET(t) case GL_DEBUG_TYPE_##t: return #t
+#define RET(t)                                                                                     \
+    case GL_DEBUG_TYPE_##t:                                                                        \
+        return #t
     switch (type) {
-    RET(ERROR);
-    RET(DEPRECATED_BEHAVIOR);
-    RET(UNDEFINED_BEHAVIOR);
-    RET(PORTABILITY);
-    RET(PERFORMANCE);
-    RET(OTHER);
-    RET(MARKER);
+        RET(ERROR);
+        RET(DEPRECATED_BEHAVIOR);
+        RET(UNDEFINED_BEHAVIOR);
+        RET(PORTABILITY);
+        RET(PERFORMANCE);
+        RET(OTHER);
+        RET(MARKER);
     default:
         UNREACHABLE();
     }
 #undef RET
 }
 
-static void APIENTRY DebugHandler(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
-                         const GLchar* message, const void* user_param) {
+static void APIENTRY DebugHandler(GLenum source, GLenum type, GLuint id, GLenum severity,
+                                  GLsizei length, const GLchar* message, const void* user_param) {
     Log::Level level;
     switch (severity) {
     case GL_DEBUG_SEVERITY_HIGH:
@@ -504,8 +545,8 @@ static void APIENTRY DebugHandler(GLenum source, GLenum type, GLuint id, GLenum 
         level = Log::Level::Debug;
         break;
     }
-    LOG_GENERIC(Log::Class::Render_OpenGL, level, "%s %s %d: %s",
-                GetSource(source), GetType(type), id, message);
+    LOG_GENERIC(Log::Class::Render_OpenGL, level, "%s %s %d: %s", GetSource(source), GetType(type),
+                id, message);
 }
 
 /// Initialize the renderer
@@ -532,5 +573,4 @@ bool RendererOpenGL::Init() {
 }
 
 /// Shutdown the renderer
-void RendererOpenGL::ShutDown() {
-}
+void RendererOpenGL::ShutDown() {}
