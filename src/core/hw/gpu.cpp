@@ -2,8 +2,10 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#include <chrono>
 #include <cstring>
 #include <numeric>
+#include <thread>
 #include <type_traits>
 
 #include "common/color.h"
@@ -414,6 +416,19 @@ static void VBlankCallback(u64 userdata, int cycles_late) {
     frame_count++;
     last_skip_frame = g_skip_frame;
     g_skip_frame = (frame_count & Settings::values.frame_skip) != 0;
+
+    if (Settings::values.use_vsync) {
+        using namespace std::chrono;
+        static auto frame_time = high_resolution_clock::now();
+        static constexpr auto update_duration = duration_cast<high_resolution_clock::duration>(16667us);
+        auto now = high_resolution_clock::now();
+        if (now < frame_time) {
+            std::this_thread::sleep_until(frame_time);
+            frame_time += update_duration;
+        } else {
+            frame_time = now + update_duration;
+        }
+    }
 
     // Swap buffers based on the frameskip mode, which is a little bit tricky. When
     // a frame is being skipped, nothing is being rendered to the internal framebuffer(s).
