@@ -499,6 +499,7 @@ static ResultCode CreateThread(Handle* out_handle, s32 priority, u32 entry_point
     case THREADPROCESSORID_DEFAULT:
     case THREADPROCESSORID_0:
     case THREADPROCESSORID_1:
+	case THREADPROCESSORID_MAX:
         break;
     default:
         // TODO(bunnei): Implement support for other processor IDs

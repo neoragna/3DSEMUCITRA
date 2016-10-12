@@ -7,6 +7,7 @@
 #include "common/assert.h"
 #include "common/logging/log.h"
 
+#include "core/settings.h"
 #include "core/hle/config_mem.h"
 #include "core/hle/kernel/kernel.h"
 #include "core/hle/kernel/memory.h"
@@ -131,7 +132,11 @@ void Init() {
 
     // TODO(yuriks): The memory type parameter needs to be determined by the ExHeader field instead
     // For now it defaults to the one with a largest allocation to the app
-    Kernel::MemoryInit(2); // Allocates 96MB to the application
+    if (Settings::values.is_new_3ds) {
+        Kernel::MemoryInit(6); // Allocates 124MB to the application(n3ds)
+    } else {
+        Kernel::MemoryInit(2); // Allocates 96MB to the application(o3ds)
+    }
 
     Kernel::ResourceLimitsInit();
     Kernel::ThreadingInit();

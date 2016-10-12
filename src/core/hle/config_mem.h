@@ -31,7 +31,7 @@ struct ConfigMemDef {
     u8     boot_firm;                    // 15
     u8     prev_firm;                    // 16
     INSERT_PADDING_BYTES(0x1);           // 17
-    u32_le ctr_sdk_ver;                  // 18
+    u32_le kernel_ctr_sdk_ver;           // 18
     INSERT_PADDING_BYTES(0x30 - 0x1C);   // 1C
     u32_le app_mem_type;                 // 30
     INSERT_PADDING_BYTES(0x40 - 0x34);   // 34
