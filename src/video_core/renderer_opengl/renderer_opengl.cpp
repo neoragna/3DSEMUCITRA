@@ -480,7 +480,22 @@ void RendererOpenGL::DrawScreens() {
 		auto y = layout.bottom_screen.top -
 			(float)(float)VideoCore::kScreenBottomHeight *
 			(float)layout.bottom_screen.GetHeight();
-	}
+		glEnable(GL_SCISSOR_TEST);
+		for (unsigned int i = 0; i < 2; i++) {
+			glScissor(x - 1, y - 2, 3, 5);
+			glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+			glScissor(x, y - 1, 1, 3);
+		    }{
+				glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+			    }{
+				glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+			}
+			glClear(GL_COLOR_BUFFER_BIT);
+			x += (float)layout.width / 2.0f;
+		}
+		glDisable(GL_SCISSOR_TEST);
+	
 	m_current_frame++;
 }
 
