@@ -14,7 +14,7 @@
 #include "common/string_util.h"
 #include "core/memory.h"
 
-#ifdef _MSC_VER
+#ifdef _WIN32
     #include <Windows.h>
     #include <codecvt>
     #include "common/common_funcs.h"
@@ -316,7 +316,7 @@ std::string ReplaceAll(std::string result, const std::string& src, const std::st
     return result;
 }
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 
 std::string UTF16ToUTF8(const std::u16string& input)
 {
