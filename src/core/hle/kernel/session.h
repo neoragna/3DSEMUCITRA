@@ -138,6 +138,13 @@ inline DescriptorType GetDescriptorType(u32 descriptor) {
     return StaticBuffer;
 }
 
+/**
+ * CheckBufferMappingTranslation function
+ *    If the translation's buffer_mapping_permission match the @param(mapping_type) type,
+ *    this function will return a true
+ */
+bool CheckBufferMappingTranslation(MappedBufferPermissions mapping_type, u32 size, u32 translation);
+
 } // namespace IPC
 
 namespace Kernel {
