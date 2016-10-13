@@ -476,7 +476,9 @@ std::string RTrim(std::string& s) {
 }
 
 std::string Trim(std::string& s) {
-    return LTrim(RTrim(s));
+    auto temp = RTrim(s);
+    auto temp2 = LTrim(temp);
+    return temp2;
 }
 
 std::string Join(const std::vector<std::string>& elements, const char* const separator) {

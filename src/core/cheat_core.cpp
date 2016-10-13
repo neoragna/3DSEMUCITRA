@@ -38,11 +38,11 @@ void RefreshCheats() {
 namespace CheatEngine {
 CheatEngine::CheatEngine() {
     // Create folder and file for cheats if it doesn't exist
-    FileUtil::CreateDir(FileUtil::GetExeDirectory() + "\\user\\cheats");
+    FileUtil::CreateDir(FileUtil::GetUserPath(D_USER_IDX) + "\\cheats");
     char buffer[50];
     sprintf(buffer, "%016llX", Loader::program_id);
     std::string file_path =
-        FileUtil::GetExeDirectory() + "\\user\\cheats\\" + std::string(buffer) + ".txt";
+        FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
     if (!FileUtil::Exists(file_path))
         FileUtil::CreateEmptyFile(file_path);
     cheats_list = ReadFileContents();
@@ -52,7 +52,7 @@ std::vector<std::shared_ptr<ICheat>> CheatEngine::ReadFileContents() {
     char buffer[50];
     auto a = sprintf(buffer, "%016llX", Loader::program_id);
     std::string file_path =
-        FileUtil::GetExeDirectory() + "\\user\\cheats\\" + std::string(buffer) + ".txt";
+        FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
 
     std::string contents;
     FileUtil::ReadFileToString(true, file_path.c_str(), contents);
@@ -66,8 +66,8 @@ std::vector<std::shared_ptr<ICheat>> CheatEngine::ReadFileContents() {
     std::string name;
     bool enabled = false;
     for (int i = 0; i < lines.size(); i++) {
-        std::string current_line = Common::Trim(std::string(lines[i].c_str()));
-
+        std::string current_line = std::string(lines[i].c_str());
+        current_line = Common::Trim(current_line);
         if (current_line == "[Gateway]") { // Codetype header
             code_type = "Gateway";
             continue;
@@ -116,7 +116,7 @@ void CheatEngine::Save(std::vector<std::shared_ptr<ICheat>> cheats) {
     char buffer[50];
     auto a = sprintf(buffer, "%016llX", Loader::program_id);
     std::string file_path =
-        FileUtil::GetExeDirectory() + "\\user\\cheats\\" + std::string(buffer) + ".txt";
+        FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
     FileUtil::IOFile file = FileUtil::IOFile(file_path, "w+");
     bool sectionGateway = false;
     for (auto& cheat : cheats) {
@@ -127,6 +127,7 @@ void CheatEngine::Save(std::vector<std::shared_ptr<ICheat>> cheats) {
             }
             file.WriteBytes(cheat->ToString().c_str(), cheat->ToString().length());
         }
+        file.WriteBytes(cheat->ToString().c_str(), cheat->ToString().length());
     }
     file.Close();
 }

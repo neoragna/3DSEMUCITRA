@@ -22,7 +22,8 @@ namespace CheatEngine {
 */
 struct CheatLine {
     CheatLine(std::string line) {
-        line = Common::Trim(std::string(line.c_str())); // remove '/0' characters if any.
+        line = std::string(line.c_str()); // remove '/0' characters if any.
+        line = Common::Trim(line);
         if (line.length() != 17) {
             type = -1;
             cheat_line = line;
