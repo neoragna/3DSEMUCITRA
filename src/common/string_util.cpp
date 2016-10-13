@@ -461,4 +461,30 @@ std::string StringFromFixedZeroTerminatedBuffer(const char* buffer, size_t max_l
 
     return std::string(buffer, len);
 }
+
+std::string Trim(std::string& str) {
+    // right trim
+    while (str.length() > 0 && (str[str.length() - 1] == ' ' || str[str.length() - 1] == '\t'))
+        str.erase(str.length() - 1, 1);
+
+    // left trim
+    while (str.length() > 0 && (str[0] == ' ' || str[0] == '\t'))
+        str.erase(0, 1);
+    return str;
+}
+
+std::string Join(const std::vector<std::string>& elements, const char* const separator) {
+    switch (elements.size()) {
+    case 0:
+        return "";
+    case 1:
+        return elements[0];
+    default:
+        std::ostringstream os;
+        std::copy(elements.begin(), elements.end() - 1,
+                  std::ostream_iterator<std::string>(os, separator));
+        os << *elements.rbegin();
+        return os.str();
+    }
+}
 }
