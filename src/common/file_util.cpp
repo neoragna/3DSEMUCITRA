@@ -85,7 +85,7 @@ bool Exists(const std::string &filename)
     std::string copy(filename);
     StripTailDirSlashes(copy);
 
-#ifdef _MSC_VER
+#ifdef _WIN32
     // Windows needs a slash to identify a driver root
     if (copy.size() != 0 && copy.back() == ':')
         copy += DIR_SEP_CHR;
