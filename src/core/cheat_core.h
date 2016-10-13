@@ -18,10 +18,10 @@ void RefreshCheats();
 }
 namespace CheatEngine {
 /*
-* Represents a single line of a cheat, i.e. 1xxxxxxxx yyyyyyyy
-*/
+ * Represents a single line of a cheat, i.e. 1xxxxxxxx yyyyyyyy
+ */
 struct CheatLine {
-    CheatLine(std::string line) {
+    explicit CheatLine(std::string line) {
         line = std::string(line.c_str()); // remove '/0' characters if any.
         line = Common::Trim(line);
         if (line.length() != 17) {
@@ -52,10 +52,10 @@ struct CheatLine {
 /*
  * Base Interface for all types of cheats.
  */
-class ICheat {
+class CheatInterface {
 public:
     virtual void Execute() = 0;
-    virtual ~ICheat() = default;
+    virtual ~CheatInterface() = default;
     virtual std::string ToString() = 0;
 
     std::vector<std::string> notes;
@@ -67,7 +67,7 @@ public:
 /*
  * Implements support for Gateway (GateShark) cheats.
  */
-class GatewayCheat : public ICheat {
+class GatewayCheat : public CheatInterface {
 public:
     GatewayCheat(std::vector<CheatLine> _cheatlines, std::vector<std::string> _notes, bool _enabled,
                  std::string _name) {
@@ -79,21 +79,19 @@ public:
     };
     void Execute() override;
     std::string ToString() override;
-
-private:
 };
 
 /*
-* Handles loading/saving of cheats and executing them.
-*/
+ * Handles loading/saving of cheats and executing them.
+ */
 class CheatEngine {
 public:
     CheatEngine();
     void Run();
-    static std::vector<std::shared_ptr<ICheat>> ReadFileContents();
-    static void Save(std::vector<std::shared_ptr<ICheat>> cheats);
+    static std::vector<std::shared_ptr<CheatInterface>> ReadFileContents();
+    static void Save(std::vector<std::shared_ptr<CheatInterface>> cheats);
 
 private:
-    std::vector<std::shared_ptr<ICheat>> cheats_list;
+    std::vector<std::shared_ptr<CheatInterface>> cheats_list;
 };
 }

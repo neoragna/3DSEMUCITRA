@@ -22,14 +22,14 @@ class CheatDialog : public QDialog {
     Q_OBJECT
 
 public:
-    explicit CheatDialog(QWidget* parent = 0);
+    explicit CheatDialog(QWidget* parent = nullptr);
     ~CheatDialog();
 
 private:
     Ui::CheatDialog* ui;
     int current_row = -1;
     bool selection_changing = false;
-    std::vector<std::shared_ptr<CheatEngine::ICheat>> cheats;
+    std::vector<std::shared_ptr<CheatEngine::CheatInterface>> cheats;
 
     void LoadCheats();
 
@@ -49,7 +49,7 @@ class QDialogEx : public QDialog {
 public:
     explicit QDialogEx(QWidget* parent = 0);
     ~QDialogEx();
-    std::shared_ptr<CheatEngine::ICheat> return_value;
+    std::shared_ptr<CheatEngine::CheatInterface> return_value;
 
 private:
     QDialogEx* ui;

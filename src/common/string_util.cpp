@@ -462,23 +462,15 @@ std::string StringFromFixedZeroTerminatedBuffer(const char* buffer, size_t max_l
     return std::string(buffer, len);
 }
 
-std::string LTrim(std::string& s) {
-    s.erase(s.begin(),
-            std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-    return s;
-}
+std::string Trim(std::string& str) {
+    // right trim
+    while (str.length() > 0 && (str[str.length() - 1] == ' ' || str[str.length() - 1] == '\t'))
+        str.erase(str.length() - 1, 1);
 
-std::string RTrim(std::string& s) {
-    s.erase(
-        std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(),
-        s.end());
-    return s;
-}
-
-std::string Trim(std::string& s) {
-    auto temp = RTrim(s);
-    auto temp2 = LTrim(temp);
-    return temp2;
+    // left trim
+    while (str.length() > 0 && (str[0] == ' ' || str[0] == '\t'))
+        str.erase(0, 1);
+    return str;
 }
 
 std::string Join(const std::vector<std::string>& elements, const char* const separator) {

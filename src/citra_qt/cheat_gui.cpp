@@ -5,6 +5,7 @@
 
 #include "cheat_gui.h"
 #include "core/loader/ncch.h"
+#include "core/hle/kernel/process.h"
 #include "ui_cheat_gui.h"
 
 CheatDialog::CheatDialog(QWidget* parent) : QDialog(parent), ui(new Ui::CheatDialog) {
@@ -22,7 +23,7 @@ CheatDialog::CheatDialog(QWidget* parent) : QDialog(parent), ui(new Ui::CheatDia
     ui->textDetails->setEnabled(false);
     ui->textNotes->setEnabled(false);
     char buffer[50];
-    auto a = sprintf(buffer, "%016llX", Loader::program_id);
+    auto a = sprintf(buffer, "%016llX", Kernel::g_current_process->codeset->program_id);
     auto game_id = std::string(buffer);
     ui->labelTitle->setText("Title ID: " + QString::fromStdString(game_id));
 

@@ -6,6 +6,7 @@
 
 #include "common/file_util.h"
 #include "core/cheat_core.h"
+#include "core/hle/kernel/process.h"
 #include "core/loader/ncch.h"
 #include "core/memory.h"
 
@@ -33,14 +34,14 @@ void RefreshCheats() {
     cheat_engine.reset();
     cheat_engine = std::make_unique<CheatEngine::CheatEngine>();
 }
-}
+} // namespace CheatCore
 
 namespace CheatEngine {
 CheatEngine::CheatEngine() {
     // Create folder and file for cheats if it doesn't exist
     FileUtil::CreateDir(FileUtil::GetUserPath(D_USER_IDX) + "\\cheats");
     char buffer[50];
-    sprintf(buffer, "%016llX", Loader::program_id);
+    sprintf(buffer, "%016llX", Kernel::g_current_process->codeset->program_id);
     std::string file_path =
         FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
     if (!FileUtil::Exists(file_path))
@@ -48,9 +49,9 @@ CheatEngine::CheatEngine() {
     cheats_list = ReadFileContents();
 }
 
-std::vector<std::shared_ptr<ICheat>> CheatEngine::ReadFileContents() {
+std::vector<std::shared_ptr<CheatInterface>> CheatEngine::ReadFileContents() {
     char buffer[50];
-    auto a = sprintf(buffer, "%016llX", Loader::program_id);
+    auto a = sprintf(buffer, "%016llX", Kernel::g_current_process->codeset->program_id);
     std::string file_path =
         FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
 
@@ -59,19 +60,16 @@ std::vector<std::shared_ptr<ICheat>> CheatEngine::ReadFileContents() {
     std::vector<std::string> lines;
     Common::SplitString(contents, '\n', lines);
 
-    std::string code_type;
+    std::string code_type =
+        "Gateway"; // If more cheat types added, need to specify which type in parsing.
     std::vector<std::string> notes;
     std::vector<CheatLine> cheat_lines;
-    std::vector<std::shared_ptr<ICheat>> cheats;
+    std::vector<std::shared_ptr<CheatInterface>> cheats;
     std::string name;
     bool enabled = false;
     for (int i = 0; i < lines.size(); i++) {
         std::string current_line = std::string(lines[i].c_str());
         current_line = Common::Trim(current_line);
-        if (current_line == "[Gateway]") { // Codetype header
-            code_type = "Gateway";
-            continue;
-        }
         if (code_type == "")
             continue;
         if (current_line.substr(0, 2) == "+[") { // Enabled code
@@ -112,22 +110,17 @@ std::vector<std::shared_ptr<ICheat>> CheatEngine::ReadFileContents() {
     return cheats;
 }
 
-void CheatEngine::Save(std::vector<std::shared_ptr<ICheat>> cheats) {
+void CheatEngine::Save(std::vector<std::shared_ptr<CheatInterface>> cheats) {
     char buffer[50];
-    auto a = sprintf(buffer, "%016llX", Loader::program_id);
+    auto a = sprintf(buffer, "%016llX", Kernel::g_current_process->codeset->program_id);
     std::string file_path =
         FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
     FileUtil::IOFile file = FileUtil::IOFile(file_path, "w+");
     bool sectionGateway = false;
     for (auto& cheat : cheats) {
         if (cheat->type == "Gateway") {
-            if (sectionGateway == false) {
-                file.WriteBytes("[Gateway]\n", 10);
-                sectionGateway = true;
-            }
             file.WriteBytes(cheat->ToString().c_str(), cheat->ToString().length());
         }
-        file.WriteBytes(cheat->ToString().c_str(), cheat->ToString().length());
     }
     file.Close();
 }
