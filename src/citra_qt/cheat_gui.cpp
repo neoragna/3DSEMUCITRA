@@ -191,8 +191,8 @@ QDialogEx::QDialogEx(QWidget* parent) : QDialog(parent), ui(this) {
     auto buttonCancel = new QPushButton();
     buttonCancel->setText("Cancel");
     connect(buttonOk, &QPushButton::released, this, [=]() {
-        if (typeSelect->currentIndex() == 0 &&
-            Common::Trim(nameblock->text().toStdString()).length() > 0) {
+        auto name = nameblock->text().toStdString();
+        if (typeSelect->currentIndex() == 0 && Common::Trim(name).length() > 0) {
             return_value = std::make_shared<CheatEngine::GatewayCheat>(
                 std::vector<CheatEngine::CheatLine>(), std::vector<std::string>(), false,
                 nameblock->text().toStdString());
