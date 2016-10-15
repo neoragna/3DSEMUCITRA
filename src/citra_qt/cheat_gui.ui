@@ -142,7 +142,7 @@
         </item>
       </layout>
     </widget>
-    <widget class="QLabel" name="label">
+    <widget class="QLabel" name="labelAvailableCheats">
       <property name="geometry">
         <rect>
           <x>10</x>
@@ -170,7 +170,7 @@
         </item>
       </layout>
     </widget>
-    <widget class="QLabel" name="label_2">
+    <widget class="QLabel" name="labelNotes">
       <property name="geometry">
         <rect>
           <x>580</x>

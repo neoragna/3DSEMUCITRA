@@ -30,30 +30,28 @@ void Init() {
 void Shutdown() {
     CoreTiming::UnscheduleEvent(tick_event, 0);
 }
+
 void RefreshCheats() {
-    cheat_engine.reset();
-    cheat_engine = std::make_unique<CheatEngine::CheatEngine>();
+    cheat_engine->RefreshCheats();
 }
 } // namespace CheatCore
 
 namespace CheatEngine {
 CheatEngine::CheatEngine() {
-    // Create folder and file for cheats if it doesn't exist
-    FileUtil::CreateDir(FileUtil::GetUserPath(D_USER_IDX) + "\\cheats");
-    char buffer[50];
-    sprintf(buffer, "%016llX", Kernel::g_current_process->codeset->program_id);
-    std::string file_path =
-        FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
+    const auto file_path = GetFilePath();
     if (!FileUtil::Exists(file_path))
         FileUtil::CreateEmptyFile(file_path);
     cheats_list = ReadFileContents();
 }
 
-std::vector<std::shared_ptr<CheatInterface>> CheatEngine::ReadFileContents() {
-    char buffer[50];
-    auto a = sprintf(buffer, "%016llX", Kernel::g_current_process->codeset->program_id);
-    std::string file_path =
-        FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
+std::string CheatEngine::GetFilePath() {
+    const auto program_id =
+        Common::StringFromFormat("%016llX", Kernel::g_current_process->codeset->program_id);
+    return FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + program_id + ".txt";
+}
+
+std::vector<std::shared_ptr<CheatBase>> CheatEngine::ReadFileContents() {
+    std::string file_path = GetFilePath();
 
     std::string contents;
     FileUtil::ReadFileToString(true, file_path.c_str(), contents);
@@ -64,16 +62,16 @@ std::vector<std::shared_ptr<CheatInterface>> CheatEngine::ReadFileContents() {
         "Gateway"; // If more cheat types added, need to specify which type in parsing.
     std::vector<std::string> notes;
     std::vector<CheatLine> cheat_lines;
-    std::vector<std::shared_ptr<CheatInterface>> cheats;
+    std::vector<std::shared_ptr<CheatBase>> cheats;
     std::string name;
     bool enabled = false;
-    for (int i = 0; i < lines.size(); i++) {
+    for (size_t i = 0; i < lines.size(); i++) {
         std::string current_line = std::string(lines[i].c_str());
         current_line = Common::Trim(current_line);
-        if (code_type == "")
+        if (current_line.empty())
             continue;
-        if (current_line.substr(0, 2) == "+[") { // Enabled code
-            if (cheat_lines.size() > 0) {
+        if (current_line.compare(0, 2, "+[") == 0) { // Enabled code
+            if (!cheat_lines.empty()) {
                 if (code_type == "Gateway")
                     cheats.push_back(
                         std::make_shared<GatewayCheat>(cheat_lines, notes, enabled, name));
@@ -83,8 +81,8 @@ std::vector<std::shared_ptr<CheatInterface>> CheatEngine::ReadFileContents() {
             notes.clear();
             enabled = true;
             continue;
-        } else if (current_line.substr(0, 1) == "[") { // Disabled code
-            if (cheat_lines.size() > 0) {
+        } else if (current_line.front() == '[') { // Disabled code
+            if (!cheat_lines.empty()) {
                 if (code_type == "Gateway")
                     cheats.push_back(
                         std::make_shared<GatewayCheat>(cheat_lines, notes, enabled, name));
@@ -94,9 +92,9 @@ std::vector<std::shared_ptr<CheatInterface>> CheatEngine::ReadFileContents() {
             notes.clear();
             enabled = false;
             continue;
-        } else if (current_line.substr(0, 1) == "*") { // Comment
+        } else if (current_line.front() == '*') { // Comment
             notes.push_back(current_line);
-        } else if (current_line.length() > 0) {
+        } else if (!current_line.empty()) {
             cheat_lines.push_back(CheatLine(current_line));
         }
         if (i == lines.size() - 1) { // End of file
@@ -110,19 +108,25 @@ std::vector<std::shared_ptr<CheatInterface>> CheatEngine::ReadFileContents() {
     return cheats;
 }
 
-void CheatEngine::Save(std::vector<std::shared_ptr<CheatInterface>> cheats) {
+void CheatEngine::Save(std::vector<std::shared_ptr<CheatBase>> cheats) {
     char buffer[50];
     auto a = sprintf(buffer, "%016llX", Kernel::g_current_process->codeset->program_id);
     std::string file_path =
         FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + std::string(buffer) + ".txt";
     FileUtil::IOFile file = FileUtil::IOFile(file_path, "w+");
-    bool sectionGateway = false;
     for (auto& cheat : cheats) {
-        if (cheat->type == "Gateway") {
-            file.WriteBytes(cheat->ToString().c_str(), cheat->ToString().length());
+        if (cheat->GetType() == "Gateway") {
+            auto cheatString = cheat->ToString();
+            file.WriteBytes(cheatString.c_str(), cheatString.length());
         }
     }
-    file.Close();
+}
+
+void CheatEngine::RefreshCheats() {
+    const auto file_path = GetFilePath();
+    if (!FileUtil::Exists(file_path))
+        FileUtil::CreateEmptyFile(file_path);
+    cheats_list = ReadFileContents();
 }
 
 void CheatEngine::Run() {
@@ -143,7 +147,7 @@ void GatewayCheat::Execute() {
     s32 loopbackline = 0;
     u32 counter = 0;
     bool loop_flag = false;
-    for (int i = 0; i < cheat_lines.size(); i++) {
+    for (size_t i = 0; i < cheat_lines.size(); i++) {
         auto line = cheat_lines[i];
         if (line.type == -1)
             continue;
@@ -151,13 +155,13 @@ void GatewayCheat::Execute() {
         val = line.value;
         if (if_flag > 0) {
             if (line.type == 0x0E)
-                i += ((line.value + 7) / 8);
+                i += (line.value + 7) / 8;
             if ((line.type == 0x0D) && (line.sub_type == 0))
                 if_flag--;                                   // ENDIF
             if ((line.type == 0x0D) && (line.sub_type == 2)) // NEXT & Flush
             {
                 if (loop_flag)
-                    i = (loopbackline - 1);
+                    i = loopbackline - 1;
                 else {
                     offset = 0;
                     reg = 0;
@@ -302,12 +306,12 @@ void GatewayCheat::Execute() {
                 break;
             case 0x01: {
                 if (loop_flag)
-                    i = (loopbackline - 1);
+                    i = loopbackline - 1;
                 break;
             }
             case 0x02: {
                 if (loop_flag)
-                    i = (loopbackline - 1);
+                    i = loopbackline - 1;
                 else {
                     offset = 0;
                     reg = 0;
@@ -382,22 +386,22 @@ void GatewayCheat::Execute() {
 }
 
 std::string GatewayCheat::ToString() {
-    std::string result = "";
-    if (cheat_lines.size() == 0)
+    std::string result;
+    if (cheat_lines.empty())
         return result;
     if (enabled)
-        result += "+";
-    result += "[" + name + "]\n";
+        result += '+';
+    result += '[' + name + "]\n";
     for (auto& str : notes) {
-        if (str.substr(0, 1) != "*")
+        if (str.compare(0, 1, "*") != 0)
             str.insert(0, "*");
     }
     result += Common::Join(notes, "\n");
-    if (notes.size() > 0)
-        result += "\n";
-    for (auto& line : cheat_lines)
-        result += line.cheat_line + "\n";
-    result += "\n";
+    if (!notes.empty())
+        result += '\n';
+    for (const auto& line : cheat_lines)
+        result += line.cheat_line + '\n';
+    result += '\n';
     return result;
 }
 }

@@ -29,7 +29,7 @@ private:
     Ui::CheatDialog* ui;
     int current_row = -1;
     bool selection_changing = false;
-    std::vector<std::shared_ptr<CheatEngine::CheatInterface>> cheats;
+    std::vector<std::shared_ptr<CheatEngine::CheatBase>> cheats;
 
     void LoadCheats();
 
@@ -47,12 +47,15 @@ private slots:
 class QDialogEx : public QDialog {
     Q_OBJECT
 public:
-    explicit QDialogEx(QWidget* parent = 0);
+    explicit QDialogEx(QWidget* parent = nullptr);
     ~QDialogEx();
-    std::shared_ptr<CheatEngine::CheatInterface> return_value;
+    std::shared_ptr<CheatEngine::CheatBase> GetReturnValue() {
+        return return_value;
+    }
 
 private:
     QDialogEx* ui;
-    QLineEdit* nameblock;
-    QComboBox* typeSelect;
+    QLineEdit* name_block;
+    QComboBox* type_select;
+    std::shared_ptr<CheatEngine::CheatBase> return_value;
 };

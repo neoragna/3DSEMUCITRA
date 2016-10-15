@@ -8,10 +8,11 @@
 
 #include "common/string_util.h"
 #include "core/core_timing.h"
+
+namespace CheatCore {
 /*
  * Starting point for running cheat codes. Initializes tick event and executes cheats every tick.
  */
-namespace CheatCore {
 void Init();
 void Shutdown();
 void RefreshCheats();
@@ -24,17 +25,18 @@ struct CheatLine {
     explicit CheatLine(std::string line) {
         line = std::string(line.c_str()); // remove '/0' characters if any.
         line = Common::Trim(line);
-        if (line.length() != 17) {
+        constexpr int cheat_length = 17;
+        if (line.length() != cheat_length) {
             type = -1;
             cheat_line = line;
             return;
         }
         try {
-            type = stoi(line.substr(0, 1), 0, 16);
-            if (type == 0xD)
-                sub_type = stoi(line.substr(1, 1), 0, 16);
-            address = stoi(line.substr(1, 8), 0, 16);
-            value = stoi(line.substr(10, 8), 0, 16);
+            type = std::stoi(line.substr(0, 1), 0, 16);
+            if (type == 0xD) // 0xD types have extra subtype value, i.e. 0xDA
+                sub_type = std::stoi(line.substr(1, 1), 0, 16);
+            address = std::stoi(line.substr(1, 8), 0, 16);
+            value = std::stoi(line.substr(10, 8), 0, 16);
             cheat_line = line;
         } catch (std::exception e) {
             type = -1;
@@ -52,12 +54,43 @@ struct CheatLine {
 /*
  * Base Interface for all types of cheats.
  */
-class CheatInterface {
+class CheatBase {
 public:
     virtual void Execute() = 0;
-    virtual ~CheatInterface() = default;
+    virtual ~CheatBase() = default;
     virtual std::string ToString() = 0;
+    std::vector<std::string>& GetNotes() {
+        return notes;
+    }
+    void SetNotes(std::vector<std::string> val) {
+        notes = val;
+    }
+    bool& GetEnabled() {
+        return enabled;
+    }
+    void SetEnabled(bool val) {
+        enabled = val;
+    }
+    std::string& GetType() {
+        return type;
+    }
+    void SetType(std::string val) {
+        type = val;
+    }
+    std::vector<CheatLine>& GetCheatLines() {
+        return cheat_lines;
+    }
+    void SetCheatLines(std::vector<CheatLine> val) {
+        cheat_lines = val;
+    }
+    std::string& GetName() {
+        return name;
+    }
+    void SetName(std::string val) {
+        name = val;
+    }
 
+protected:
     std::vector<std::string> notes;
     bool enabled;
     std::string type;
@@ -67,14 +100,21 @@ public:
 /*
  * Implements support for Gateway (GateShark) cheats.
  */
-class GatewayCheat : public CheatInterface {
+class GatewayCheat : public CheatBase {
 public:
-    GatewayCheat(std::vector<CheatLine> _cheatlines, std::vector<std::string> _notes, bool _enabled,
-                 std::string _name) {
-        cheat_lines = _cheatlines;
-        notes = _notes;
-        enabled = _enabled;
-        name = _name;
+    GatewayCheat(std::string name_) {
+        cheat_lines = std::vector<CheatLine>();
+        notes = std::vector<std::string>();
+        enabled = false;
+        name = name_;
+        type = "Gateway";
+    };
+    GatewayCheat(std::vector<CheatLine> cheat_lines_, std::vector<std::string> notes_,
+                 bool enabled_, std::string name_) {
+        cheat_lines = std::move(cheat_lines_);
+        notes = std::move(notes_);
+        enabled = enabled_;
+        name = std::move(name_);
         type = "Gateway";
     };
     void Execute() override;
@@ -88,10 +128,12 @@ class CheatEngine {
 public:
     CheatEngine();
     void Run();
-    static std::vector<std::shared_ptr<CheatInterface>> ReadFileContents();
-    static void Save(std::vector<std::shared_ptr<CheatInterface>> cheats);
+    static std::vector<std::shared_ptr<CheatBase>> ReadFileContents();
+    static void Save(std::vector<std::shared_ptr<CheatBase>> cheats);
+    void RefreshCheats();
 
 private:
-    std::vector<std::shared_ptr<CheatInterface>> cheats_list;
+    std::vector<std::shared_ptr<CheatBase>> cheats_list;
+    static std::string GetFilePath();
 };
 }

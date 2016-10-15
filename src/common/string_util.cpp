@@ -481,10 +481,14 @@ std::string Join(const std::vector<std::string>& elements, const char* const sep
         return elements[0];
     default:
         std::ostringstream os;
-        std::copy(elements.begin(), elements.end() - 1,
+        std::copy(elements.begin(), elements.end(),
                   std::ostream_iterator<std::string>(os, separator));
-        os << *elements.rbegin();
-        return os.str();
+
+        // Drop the trailing delimiter.
+        std::string result = os.str();
+        result.pop_back();
+
+        return result;
     }
 }
 }
