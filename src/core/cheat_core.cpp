@@ -7,7 +7,6 @@
 #include "common/file_util.h"
 #include "core/cheat_core.h"
 #include "core/hle/kernel/process.h"
-#include "core/loader/ncch.h"
 #include "core/memory.h"
 
 namespace CheatCore {
