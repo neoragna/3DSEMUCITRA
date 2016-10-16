@@ -54,7 +54,7 @@ void CheatDialog::LoadCheats() {
             i, 1, new QTableWidgetItem(QString::fromStdString(cheats[i]->GetName())));
         ui->tableCheats->setItem(
             i, 2, new QTableWidgetItem(QString::fromStdString(cheats[i]->GetType())));
-        enabled->setProperty("row", i);
+        enabled->setProperty("row", static_cast<int>(i));
 
         connect(enabled, &QCheckBox::stateChanged, this, &CheatDialog::OnCheckChanged);
     }
