@@ -56,7 +56,8 @@ void CheatDialog::LoadCheats() {
         ui->tableCheats->setItem(
             i, 2, new QTableWidgetItem(QString::fromStdString(cheats[i]->GetType())));
         enabled->setProperty("row", i);
-        connect(enabled, SIGNAL(stateChanged(int)), this, SLOT(OnCheckChanged(int)));
+
+		connect(enabled, &QCheckBox::stateChanged, this, &CheatDialog::OnCheckChanged);
     }
 }
 
@@ -102,7 +103,9 @@ void CheatDialog::OnNotesChanged() {
     if (selection_changing)
         return;
     auto notes = ui->textNotes->toPlainText();
-    Common::SplitString(notes.toStdString(), '\n', cheats[current_row]->GetNotes());
+	auto old_notes = cheats[current_row]->GetNotes();
+    Common::SplitString(notes.toStdString(), '\n', old_notes);
+	cheats[current_row]->SetNotes(old_notes);
 }
 
 void CheatDialog::OnDetailsChanged() {
@@ -111,10 +114,11 @@ void CheatDialog::OnDetailsChanged() {
     auto details = ui->textDetails->toPlainText();
     std::vector<std::string> detail_lines;
     Common::SplitString(details.toStdString(), '\n', detail_lines);
-    cheats[current_row]->GetCheatLines().clear();
+	auto new_lines = std::vector<CheatEngine::CheatLine>();
     for (const auto& line : detail_lines) {
-        cheats[current_row]->GetCheatLines().emplace_back(line);
+		new_lines.emplace_back(line);
     }
+	cheats[current_row]->SetCheatLines(new_lines);
 }
 
 void CheatDialog::OnCheckChanged(int state) {
@@ -141,7 +145,7 @@ void CheatDialog::OnDelete() {
 }
 
 void CheatDialog::OnAddCheat() {
-    QDialogEx dialog;
+    NewCheatDialog dialog;
 
     dialog.exec();
 
@@ -149,23 +153,23 @@ void CheatDialog::OnAddCheat() {
     if (result == nullptr)
         return;
     cheats.push_back(result);
-    int newCheatIndex = static_cast<int>(cheats.size() - 1);
+    int new_cheat_index = static_cast<int>(cheats.size() - 1);
     auto enabled = new QCheckBox();
     ui->tableCheats->setRowCount(cheats.size());
     enabled->setCheckState(Qt::CheckState::Unchecked);
     enabled->setStyleSheet("margin-left:7px;");
-    ui->tableCheats->setItem(newCheatIndex, 0, new QTableWidgetItem());
-    ui->tableCheats->setCellWidget(newCheatIndex, 0, enabled);
-    ui->tableCheats->setItem(newCheatIndex, 1, new QTableWidgetItem(QString::fromStdString(
-                                                   cheats[newCheatIndex]->GetName())));
-    ui->tableCheats->setItem(newCheatIndex, 2, new QTableWidgetItem(QString::fromStdString(
-                                                   cheats[newCheatIndex]->GetType())));
-    enabled->setProperty("row", newCheatIndex);
+    ui->tableCheats->setItem(new_cheat_index, 0, new QTableWidgetItem());
+    ui->tableCheats->setCellWidget(new_cheat_index, 0, enabled);
+    ui->tableCheats->setItem(new_cheat_index, 1, new QTableWidgetItem(QString::fromStdString(
+                                                   cheats[new_cheat_index]->GetName())));
+    ui->tableCheats->setItem(new_cheat_index, 2, new QTableWidgetItem(QString::fromStdString(
+                                                   cheats[new_cheat_index]->GetType())));
+    enabled->setProperty("row", new_cheat_index);
     connect(enabled, SIGNAL(stateChanged(int)), this, SLOT(OnCheckChanged(int)));
-    ui->tableCheats->selectRow(newCheatIndex);
-    OnRowSelected(newCheatIndex, 0);
+    ui->tableCheats->selectRow(new_cheat_index);
+    OnRowSelected(new_cheat_index, 0);
 }
-QDialogEx::QDialogEx(QWidget* parent) : QDialog(parent), ui(this) {
+NewCheatDialog::NewCheatDialog(QWidget* parent) : QDialog(parent) {
     resize(250, 150);
     setSizeGripEnabled(false);
     auto mainLayout = new QVBoxLayout(this);
@@ -185,25 +189,25 @@ QDialogEx::QDialogEx(QWidget* parent) : QDialog(parent), ui(this) {
     typePanel->addWidget(typeLabel);
     typePanel->addWidget(type_select);
 
-    QHBoxLayout* confirmationPanel = new QHBoxLayout();
-    auto buttonOk = new QPushButton();
-    buttonOk->setText("Ok");
-    auto buttonCancel = new QPushButton();
-    buttonCancel->setText("Cancel");
-    connect(buttonOk, &QPushButton::released, this, [=]() {
-        auto name = name_block->text().toStdString();
-        if (type_select->currentIndex() == 0 && Common::Trim(name).length() > 0) {
-            return_value =
-                std::make_shared<CheatEngine::GatewayCheat>(name_block->text().toStdString());
-        }
-        ui->close();
-    });
-    connect(buttonCancel, &QPushButton::released, this, [=]() { ui->close(); });
+	auto button_box = new QDialogButtonBox(QDialogButtonBox::Ok
+		| QDialogButtonBox::Cancel);
+	connect(button_box, &QDialogButtonBox::accepted, this, [=]() {
+		auto name = name_block->text().toStdString();
+		if (type_select->currentIndex() == 0 && Common::Trim(name).length() > 0) {
+			return_value =
+				std::make_shared<CheatEngine::GatewayCheat>(name_block->text().toStdString());
+		}
+		this->close();
+	});
+	connect(button_box, &QDialogButtonBox::rejected, this, [=]() { this->close(); });
 
-    confirmationPanel->addWidget(buttonOk);
-    confirmationPanel->addWidget(buttonCancel);
+
+
+
+    QHBoxLayout* confirmationPanel = new QHBoxLayout();
+	confirmationPanel->addWidget(button_box);
     mainLayout->addLayout(namePanel);
     mainLayout->addLayout(typePanel);
     mainLayout->addLayout(confirmationPanel);
 }
-QDialogEx::~QDialogEx() {}
+NewCheatDialog::~NewCheatDialog() {}

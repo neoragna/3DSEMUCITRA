@@ -15,7 +15,7 @@ class QLineEdit;
 class QWidget;
 namespace Ui {
 class CheatDialog;
-class QDialogEx;
+class NewCheatDialog;
 }
 
 class CheatDialog : public QDialog {
@@ -44,17 +44,16 @@ private slots:
     void OnDelete();
 };
 
-class QDialogEx : public QDialog {
+class NewCheatDialog : public QDialog {
     Q_OBJECT
 public:
-    explicit QDialogEx(QWidget* parent = nullptr);
-    ~QDialogEx();
-    std::shared_ptr<CheatEngine::CheatBase> GetReturnValue() {
+    explicit NewCheatDialog(QWidget* parent = nullptr);
+    ~NewCheatDialog();
+    std::shared_ptr<CheatEngine::CheatBase> GetReturnValue() const {
         return return_value;
     }
 
 private:
-    QDialogEx* ui;
     QLineEdit* name_block;
     QComboBox* type_select;
     std::shared_ptr<CheatEngine::CheatBase> return_value;

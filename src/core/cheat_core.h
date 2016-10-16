@@ -33,7 +33,8 @@ struct CheatLine {
         }
         try {
             type = std::stoi(line.substr(0, 1), 0, 16);
-            if (type == 0xD) // 0xD types have extra subtype value, i.e. 0xDA
+            // 0xD types have extra subtype value, i.e. 0xDA
+            if (type == 0xD)
                 sub_type = std::stoi(line.substr(1, 1), 0, 16);
             address = std::stoi(line.substr(1, 8), 0, 16);
             value = std::stoi(line.substr(10, 8), 0, 16);
@@ -59,40 +60,40 @@ public:
     virtual void Execute() = 0;
     virtual ~CheatBase() = default;
     virtual std::string ToString() = 0;
-    std::vector<std::string>& GetNotes() {
+    const std::vector<std::string>& GetNotes() const {
         return notes;
     }
-    void SetNotes(std::vector<std::string> val) {
-        notes = val;
+    void SetNotes(std::vector<std::string> new_notes) {
+        notes = std::move(new_notes);
     }
-    bool& GetEnabled() {
+    bool GetEnabled() const {
         return enabled;
     }
-    void SetEnabled(bool val) {
-        enabled = val;
+    void SetEnabled(bool enabled_) {
+        enabled = enabled_;
     }
-    std::string& GetType() {
+    const std::string& GetType() const {
         return type;
     }
-    void SetType(std::string val) {
-        type = val;
+    void SetType(std::string new_type) {
+        type = std::move(new_type);
     }
-    std::vector<CheatLine>& GetCheatLines() {
+    const std::vector<CheatLine>& GetCheatLines() const {
         return cheat_lines;
     }
-    void SetCheatLines(std::vector<CheatLine> val) {
-        cheat_lines = val;
+    void SetCheatLines(std::vector<CheatLine> new_lines) {
+        cheat_lines = std::move(new_lines);
     }
-    std::string& GetName() {
+    const std::string& GetName() const {
         return name;
     }
-    void SetName(std::string val) {
-        name = val;
+    void SetName(std::string new_name) {
+        name = std::move(new_name);
     }
 
 protected:
     std::vector<std::string> notes;
-    bool enabled;
+    bool enabled = false;
     std::string type;
     std::vector<CheatLine> cheat_lines;
     std::string name;
@@ -103,12 +104,9 @@ protected:
 class GatewayCheat : public CheatBase {
 public:
     GatewayCheat(std::string name_) {
-        cheat_lines = std::vector<CheatLine>();
-        notes = std::vector<std::string>();
-        enabled = false;
-        name = name_;
+        name = std::move(name_);
         type = "Gateway";
-    };
+    }
     GatewayCheat(std::vector<CheatLine> cheat_lines_, std::vector<std::string> notes_,
                  bool enabled_, std::string name_) {
         cheat_lines = std::move(cheat_lines_);
@@ -134,6 +132,5 @@ public:
 
 private:
     std::vector<std::shared_ptr<CheatBase>> cheats_list;
-    static std::string GetFilePath();
 };
 }
