@@ -36,7 +36,7 @@ void RefreshCheats() {
 } // namespace CheatCore
 
 namespace CheatEngine {
-std::string GetFilePath() {
+static std::string GetFilePath() {
     const auto program_id =
         Common::StringFromFormat("%016llX", Kernel::g_current_process->codeset->program_id);
     return FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + program_id + ".txt";
@@ -386,8 +386,8 @@ std::string GatewayCheat::ToString() {
         result += '+';
     result += '[' + name + "]\n";
     for (auto& str : notes) {
-        if (str.compare(0, 1, "*") != 0)
-            str.insert(0, "*");
+        if (str.front() == '*')
+            str.insert(0, 1, '*');
     }
     result += Common::Join(notes, "\n");
     if (!notes.empty())

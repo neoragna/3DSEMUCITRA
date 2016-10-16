@@ -26,7 +26,7 @@ public:
     ~CheatDialog();
 
 private:
-    Ui::CheatDialog* ui;
+    std::unique_ptr<Ui::CheatDialog> ui;
     int current_row = -1;
     bool selection_changing = false;
     std::vector<std::shared_ptr<CheatEngine::CheatBase>> cheats;

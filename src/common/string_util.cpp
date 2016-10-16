@@ -462,15 +462,24 @@ std::string StringFromFixedZeroTerminatedBuffer(const char* buffer, size_t max_l
     return std::string(buffer, len);
 }
 
-std::string Trim(std::string& str) {
-    // right trim
-    while (str.length() > 0 && (str[str.length() - 1] == ' ' || str[str.length() - 1] == '\t'))
-        str.erase(str.length() - 1, 1);
+std::string TrimLeft(const std::string& str, const std::string& delimiters = " \f\n\r\t\v") {
+    const auto pos = str.find_first_not_of(delimiters);
+    if (pos == std::string::npos)
+        return {};
 
-    // left trim
-    while (str.length() > 0 && (str[0] == ' ' || str[0] == '\t'))
-        str.erase(0, 1);
-    return str;
+    return str.substr(pos);
+}
+
+std::string TrimRight(const std::string& str, const std::string delimiters = " \f\n\r\t\v") {
+    const auto pos = str.find_last_not_of(delimiters);
+    if (pos == std::string::npos)
+        return {};
+
+    return str.substr(0, pos + 1);
+}
+
+std::string Trim(const std::string& str, const std::string delimiters) {
+    return TrimLeft(TrimRight(str, delimiters), delimiters);
 }
 
 std::string Join(const std::vector<std::string>& elements, const char* const separator) {

@@ -139,7 +139,7 @@ bool ComparePartialString(InIt begin, InIt end, const char* other) {
  */
 std::string StringFromFixedZeroTerminatedBuffer(const char* buffer, size_t max_len);
 
-std::string Trim(std::string& s);
+std::string Trim(const std::string& str, const std::string delimiters = " \f\n\r\t\v");
 
 std::string Join(const std::vector<std::string>& elements, const char* const separator);
 }

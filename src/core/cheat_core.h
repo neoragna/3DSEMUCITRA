@@ -108,12 +108,11 @@ public:
         type = "Gateway";
     }
     GatewayCheat(std::vector<CheatLine> cheat_lines_, std::vector<std::string> notes_,
-                 bool enabled_, std::string name_) {
+                 bool enabled_, std::string name_)
+        : GatewayCheat{std::move(name_)} {
         cheat_lines = std::move(cheat_lines_);
         notes = std::move(notes_);
         enabled = enabled_;
-        name = std::move(name_);
-        type = "Gateway";
     };
     void Execute() override;
     std::string ToString() override;

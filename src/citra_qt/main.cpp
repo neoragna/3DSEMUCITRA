@@ -556,8 +556,8 @@ void GMainWindow::OnConfigure() {
 }
 
 void GMainWindow::OnCheats() {
-    CheatDialog cheatDialog(this);
-    cheatDialog.exec();
+    CheatDialog cheat_dialog(this);
+    cheat_dialog.exec();
 }
 
 void GMainWindow::OnCreateGraphicsSurfaceViewer() {
