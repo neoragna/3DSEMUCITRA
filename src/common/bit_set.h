@@ -3,7 +3,7 @@
 #pragma once
 
 #include <cstddef>
-#ifdef _WIN32
+#ifdef _WIN64
 #include <intrin.h>
 #endif
 #include <initializer_list>
@@ -16,7 +16,7 @@ namespace Common {
 
 // Helper functions:
 
-#ifdef _WIN32
+#ifdef _WIN64
 template <typename T>
 static inline int CountSetBits(T v)
 {

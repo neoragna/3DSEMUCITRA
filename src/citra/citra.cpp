@@ -17,7 +17,7 @@
 #include <getopt.h>
 #endif
 
-#ifdef _WIN32
+#ifdef _WIN64
 #include <Windows.h>
 #endif
 
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     bool use_gdbstub = Settings::values.use_gdbstub;
     u32 gdb_port = static_cast<u32>(Settings::values.gdbstub_port);
     char *endarg;
-#ifdef _WIN32
+#ifdef _WIN64
     int argc_w;
     auto argv_w = CommandLineToArgvW(GetCommandLineW(), &argc_w);
 
@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
                 return 0;
             }
         } else {
-#ifdef _WIN32
+#ifdef _WIN64
             boot_filename = Common::UTF16ToUTF8(argv_w[optind]);
 #else
             boot_filename = argv[optind];
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
         }
     }
 
-#ifdef _WIN32
+#ifdef _WIN64
     LocalFree(argv_w);
 #endif
 

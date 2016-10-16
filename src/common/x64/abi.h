@@ -27,7 +27,7 @@
 #define ABI_ALL_FPRS BitSet32(0xffff0000)
 #define ABI_ALL_GPRS BitSet32(0x0000ffff)
 
-#ifdef _WIN32 // 64-bit Windows - the really exotic calling convention
+#ifdef _WIN64 // 64-bit Windows - the really exotic calling convention
 
 #define ABI_PARAM1 RCX
 #define ABI_PARAM2 RDX

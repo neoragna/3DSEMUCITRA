@@ -24,7 +24,7 @@ using namespace Gen;
 
 void XEmitter::ABI_CalculateFrameSize(BitSet32 mask, size_t rsp_alignment, size_t needed_frame_size, size_t* shadowp, size_t* subtractionp, size_t* xmm_offsetp) {
     size_t shadow = 0;
-#if defined(_WIN32)
+#if defined(_WIN64)
     shadow = 0x20;
 #endif
 

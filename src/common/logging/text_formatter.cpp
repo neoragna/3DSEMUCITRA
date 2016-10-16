@@ -5,7 +5,7 @@
 #include <array>
 #include <cstdio>
 
-#ifdef _WIN32
+#ifdef _WIN64
 #   define WIN32_LEAN_AND_MEAN
 #   include <Windows.h>
 #endif
@@ -63,7 +63,7 @@ void PrintMessage(const Entry& entry) {
 }
 
 void PrintColoredMessage(const Entry& entry) {
-#ifdef _WIN32
+#ifdef _WIN64
     static HANDLE console_handle = GetStdHandle(STD_ERROR_HANDLE);
 
     CONSOLE_SCREEN_BUFFER_INFO original_info = {0};
@@ -113,7 +113,7 @@ void PrintColoredMessage(const Entry& entry) {
 
     PrintMessage(entry);
 
-#ifdef _WIN32
+#ifdef _WIN64
     SetConsoleTextAttribute(console_handle, original_info.wAttributes);
 #else
     fputs(ESC "[0m", stderr);

@@ -18,7 +18,7 @@
 #include "core/hle/service/soc_u.h"
 #include "core/memory.h"
 
-#ifdef _WIN32
+#ifdef _WIN64
     #include <winsock2.h>
     #include <ws2tcpip.h>
 
@@ -43,7 +43,7 @@
     #include <unistd.h>
 #endif
 
-#ifdef _WIN32
+#ifdef _WIN64
 #    define WSAEAGAIN      WSAEWOULDBLOCK
 #    define WSAEMULTIHOP   -1 // Invalid dummy value
 #    define ERRNO(x)       WSA##x
@@ -160,7 +160,7 @@ static const std::unordered_map<int, int> sockopt_map = { {
     { 0x1001,   SO_SNDBUF },
     { 0x1002,   SO_RCVBUF },
     { 0x1003,   -1 },
-#ifdef _WIN32
+#ifdef _WIN64
     /// Unsupported in WinSock2
     { 0x1004,   -1 },
 #else
@@ -481,7 +481,7 @@ static void Fcntl(Service::Interface* self) {
     });
 
     if (ctr_cmd == 3) { // F_GETFL
-#ifdef _WIN32
+#ifdef _WIN64
         posix_ret = 0;
         auto iter = open_sockets.find(socket_handle);
         if (iter != open_sockets.end() && iter->second.blocking == false)
@@ -498,7 +498,7 @@ static void Fcntl(Service::Interface* self) {
             posix_ret |= 4; // O_NONBLOCK
 #endif
     } else if (ctr_cmd == 4) { // F_SETFL
-#ifdef _WIN32
+#ifdef _WIN64
         unsigned long tmp = (ctr_arg & 4 /* O_NONBLOCK */) ? 1 : 0;
         int ret = ioctlsocket(socket_handle, FIONBIO, &tmp);
         if (ret == SOCKET_ERROR_VALUE) {
@@ -804,7 +804,7 @@ static void Connect(Service::Interface* self) {
 
 static void InitializeSockets(Service::Interface* self) {
     // TODO(Subv): Implement
-#ifdef _WIN32
+#ifdef _WIN64
     WSADATA data;
     WSAStartup(MAKEWORD(2, 2), &data);
 #endif
@@ -818,7 +818,7 @@ static void ShutdownSockets(Service::Interface* self) {
     // TODO(Subv): Implement
     CleanupSockets();
 
-#ifdef _WIN32
+#ifdef _WIN64
     WSACleanup();
 #endif
 
@@ -837,7 +837,7 @@ static void GetSockOpt(Service::Interface* self) {
     int err = 0;
 
     if(optname < 0) {
-#ifdef _WIN32
+#ifdef _WIN64
         err = WSAEINVAL;
 #else
         err = EINVAL;
@@ -871,7 +871,7 @@ static void SetSockOpt(Service::Interface* self) {
     int err = 0;
 
     if(optname < 0) {
-#ifdef _WIN32
+#ifdef _WIN64
         err = WSAEINVAL;
 #else
         err = EINVAL;
@@ -996,7 +996,7 @@ Interface::Interface() {
 
 Interface::~Interface() {
     CleanupSockets();
-#ifdef _WIN32
+#ifdef _WIN64
     WSACleanup();
 #endif
 }

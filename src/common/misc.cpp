@@ -4,7 +4,7 @@
 
 #include <cstddef>
 
-#ifdef _WIN32
+#ifdef _WIN64
 #include <windows.h>
 #else
 #include <cerrno>
@@ -23,7 +23,7 @@ const char* GetLastErrorMsg()
 {
     static const size_t buff_size = 255;
 
-#ifdef _WIN32
+#ifdef _WIN64
     static __declspec(thread) char err_str[buff_size] = {};
 
     FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, GetLastError(),

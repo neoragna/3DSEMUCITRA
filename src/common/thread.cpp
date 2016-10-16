@@ -6,7 +6,7 @@
 
 #ifdef __APPLE__
     #include <mach/mach.h>
-#elif defined(_WIN32)
+#elif defined(_WIN64)
     #include <Windows.h>
 #else
     #if defined(BSD4_4) || defined(__OpenBSD__)
@@ -17,7 +17,7 @@
     #include <sched.h>
 #endif
 
-#ifndef _WIN32
+#ifndef _WIN64
     #include <unistd.h>
 #endif
 
@@ -35,7 +35,7 @@ int CurrentThreadId()
 #endif
 }
 
-#ifdef _WIN32
+#ifdef _WIN64
 // Supporting functions
 void SleepCurrentThread(int ms)
 {
@@ -117,7 +117,7 @@ void SetCurrentThreadAffinity(u32 mask)
     SetThreadAffinity(pthread_self(), mask);
 }
 
-#ifndef _WIN32
+#ifndef _WIN64
 void SleepCurrentThread(int ms)
 {
     usleep(1000 * ms);
@@ -130,7 +130,7 @@ void SwitchCurrentThread()
 #endif
 
 // MinGW with the POSIX threading model does not support pthread_setname_np
-#if !defined(_WIN32) || defined(_MSC_VER)
+#if !defined(_WIN64) || defined(_MSC_VER)
 void SetCurrentThreadName(const char* szThreadName)
 {
 #ifdef __APPLE__

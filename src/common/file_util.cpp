@@ -8,7 +8,7 @@
 #include "common/file_util.h"
 #include "common/logging/log.h"
 
-#ifdef _WIN32
+#ifdef _WIN64
     #include <windows.h>
     #include <shlobj.h> // for SHGetFolderPath
     #include <shellapi.h>
@@ -85,7 +85,7 @@ bool Exists(const std::string &filename)
     std::string copy(filename);
     StripTailDirSlashes(copy);
 
-#ifdef _WIN32
+#ifdef _WIN64
     // Windows needs a slash to identify a driver root
     if (copy.size() != 0 && copy.back() == ':')
         copy += DIR_SEP_CHR;
@@ -103,7 +103,7 @@ u64 GetFileModificationTimestamp(const std::string& filepath) {
     if (FileUtil::Exists(filepath)) {
         struct stat64 file_info;
 
-#ifdef _WIN32
+#ifdef _WIN64
         if (0 == _wstat64(Common::UTF8ToUTF16W(filepath).c_str(), &file_info)) {
 #else
         if (0 == stat64(filepath.c_str(), &file_info)) {
@@ -122,7 +122,7 @@ bool IsDirectory(const std::string &filename)
     std::string copy(filename);
     StripTailDirSlashes(copy);
 
-#ifdef _WIN32
+#ifdef _WIN64
     // Windows needs a slash to identify a driver root
     if (copy.size() != 0 && copy.back() == ':')
         copy += DIR_SEP_CHR;
@@ -162,7 +162,7 @@ bool Delete(const std::string &filename)
         return false;
     }
 
-#ifdef _WIN32
+#ifdef _WIN64
     if (!DeleteFileW(Common::UTF8ToUTF16W(filename).c_str()))
     {
         LOG_ERROR(Common_Filesystem, "DeleteFile failed on %s: %s",
@@ -184,7 +184,7 @@ bool Delete(const std::string &filename)
 bool CreateDir(const std::string &path)
 {
     LOG_TRACE(Common_Filesystem, "directory %s", path.c_str());
-#ifdef _WIN32
+#ifdef _WIN64
     if (::CreateDirectoryW(Common::UTF8ToUTF16W(path).c_str(), nullptr))
         return true;
     DWORD error = GetLastError();
@@ -265,7 +265,7 @@ bool DeleteDir(const std::string &filename)
         return false;
     }
 
-#ifdef _WIN32
+#ifdef _WIN64
     if (::RemoveDirectoryW(Common::UTF8ToUTF16W(filename).c_str()))
         return true;
 #else
@@ -282,7 +282,7 @@ bool Rename(const std::string &srcFilename, const std::string &destFilename)
 {
     LOG_TRACE(Common_Filesystem, "%s --> %s",
             srcFilename.c_str(), destFilename.c_str());
-#ifdef _WIN32
+#ifdef _WIN64
     if (_wrename(Common::UTF8ToUTF16W(srcFilename).c_str(), Common::UTF8ToUTF16W(destFilename).c_str()) == 0)
         return true;
 #else
@@ -299,7 +299,7 @@ bool Copy(const std::string &srcFilename, const std::string &destFilename)
 {
     LOG_TRACE(Common_Filesystem, "%s --> %s",
             srcFilename.c_str(), destFilename.c_str());
-#ifdef _WIN32
+#ifdef _WIN64
     if (CopyFileW(Common::UTF8ToUTF16W(srcFilename).c_str(), Common::UTF8ToUTF16W(destFilename).c_str(), FALSE))
         return true;
 
@@ -387,7 +387,7 @@ u64 GetSize(const std::string &filename)
     }
 
     struct stat64 buf;
-#ifdef _WIN32
+#ifdef _WIN64
     if (_wstat64(Common::UTF8ToUTF16W(filename).c_str(), &buf) == 0)
 #else
     if (stat64(filename.c_str(), &buf) == 0)
@@ -460,7 +460,7 @@ bool ForeachDirectoryEntry(unsigned* num_entries_out, const std::string &directo
     // Save the status of callback function
     bool callback_error = false;
 
-#ifdef _WIN32
+#ifdef _WIN64
     // Find the first file in the directory.
     WIN32_FIND_DATAW ffd;
 
@@ -494,7 +494,7 @@ bool ForeachDirectoryEntry(unsigned* num_entries_out, const std::string &directo
         }
         found_entries += ret_entries;
 
-#ifdef _WIN32
+#ifdef _WIN64
     } while (FindNextFileW(handle_find, &ffd) != 0);
     FindClose(handle_find);
 #else
@@ -571,7 +571,7 @@ bool DeleteDirRecursively(const std::string &directory, unsigned int recursion)
 // Create directory and copy contents (does not overwrite existing files)
 void CopyDir(const std::string &source_path, const std::string &dest_path)
 {
-#ifndef _WIN32
+#ifndef _WIN64
     if (source_path == dest_path) return;
     if (!FileUtil::Exists(source_path)) return;
     if (!FileUtil::Exists(dest_path)) FileUtil::CreateFullPath(dest_path);
@@ -609,7 +609,7 @@ void CopyDir(const std::string &source_path, const std::string &dest_path)
 std::string GetCurrentDir()
 {
     // Get the current working directory (getcwd uses malloc)
-#ifdef _WIN32
+#ifdef _WIN64
     wchar_t *dir;
     if (!(dir = _wgetcwd(nullptr, 0))) {
 #else
@@ -620,7 +620,7 @@ std::string GetCurrentDir()
                 GetLastErrorMsg());
         return nullptr;
     }
-#ifdef _WIN32
+#ifdef _WIN64
     std::string strDir = Common::UTF16ToUTF8(dir);
 #else
     std::string strDir = dir;
@@ -632,7 +632,7 @@ std::string GetCurrentDir()
 // Sets the current directory to the given directory
 bool SetCurrentDir(const std::string &directory)
 {
-#ifdef _WIN32
+#ifdef _WIN64
     return _wchdir(Common::UTF8ToUTF16W(directory).c_str()) == 0;
 #else
     return chdir(directory.c_str()) == 0;
@@ -655,7 +655,7 @@ std::string GetBundleDirectory()
 }
 #endif
 
-#ifdef _WIN32
+#ifdef _WIN64
 std::string& GetExeDirectory()
 {
     static std::string exe_path;
@@ -745,7 +745,7 @@ const std::string& GetUserPath(const unsigned int DirIDX, const std::string &new
     // Set up all paths and files on the first run
     if (paths[D_USER_IDX].empty())
     {
-#ifdef _WIN32
+#ifdef _WIN64
         paths[D_USER_IDX]   = GetExeDirectory() + DIR_SEP USERDATA_DIR DIR_SEP;
         paths[D_CONFIG_IDX] = paths[D_USER_IDX] + CONFIG_DIR DIR_SEP;
         paths[D_CACHE_IDX]  = paths[D_USER_IDX] + CACHE_DIR DIR_SEP;
@@ -940,7 +940,7 @@ void IOFile::Swap(IOFile& other)
 bool IOFile::Open(const std::string& filename, const char openmode[])
 {
     Close();
-#ifdef _WIN32
+#ifdef _WIN64
     _wfopen_s(&m_file, Common::UTF8ToUTF16W(filename).c_str(), Common::UTF8ToUTF16W(openmode).c_str());
 #else
     m_file = fopen(filename.c_str(), openmode);
@@ -994,7 +994,7 @@ bool IOFile::Flush()
 bool IOFile::Resize(u64 size)
 {
     if (!IsOpen() || 0 !=
-#ifdef _WIN32
+#ifdef _WIN64
         // ector: _chsize sucks, not 64-bit safe
         // F|RES: changed to _chsize_s. i think it is 64-bit safe
         _chsize_s(_fileno(m_file), size)

@@ -6,7 +6,7 @@
 #include "common/logging/log.h"
 #include "common/memory_util.h"
 
-#ifdef _WIN32
+#ifdef _WIN64
     #include <windows.h>
     #include <psapi.h>
     #include "common/common_funcs.h"
@@ -16,7 +16,7 @@
     #include <sys/mman.h>
 #endif
 
-#if !defined(_WIN32) && defined(ARCHITECTURE_X64) && !defined(MAP_32BIT)
+#if !defined(_WIN64) && defined(ARCHITECTURE_X64) && !defined(MAP_32BIT)
 #include <unistd.h>
 #define PAGE_MASK     (getpagesize() - 1)
 #define round_page(x) ((((unsigned long)(x)) + PAGE_MASK) & ~(PAGE_MASK))
@@ -27,7 +27,7 @@
 
 void* AllocateExecutableMemory(size_t size, bool low)
 {
-#if defined(_WIN32)
+#if defined(_WIN64)
     void* ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 #else
     static char* map_hint = nullptr;
@@ -47,9 +47,9 @@ void* AllocateExecutableMemory(size_t size, bool low)
         | (low ? MAP_32BIT : 0)
 #endif
         , -1, 0);
-#endif /* defined(_WIN32) */
+#endif /* defined(_WIN64) */
 
-#ifdef _WIN32
+#ifdef _WIN64
     if (ptr == nullptr)
     {
 #else
@@ -59,7 +59,7 @@ void* AllocateExecutableMemory(size_t size, bool low)
 #endif
         LOG_ERROR(Common_Memory, "Failed to allocate executable memory");
     }
-#if !defined(_WIN32) && defined(ARCHITECTURE_X64) && !defined(MAP_32BIT)
+#if !defined(_WIN64) && defined(ARCHITECTURE_X64) && !defined(MAP_32BIT)
     else
     {
         if (low)
@@ -80,7 +80,7 @@ void* AllocateExecutableMemory(size_t size, bool low)
 
 void* AllocateMemoryPages(size_t size)
 {
-#ifdef _WIN32
+#ifdef _WIN64
     void* ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_READWRITE);
 #else
     void* ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE,
@@ -98,7 +98,7 @@ void* AllocateMemoryPages(size_t size)
 
 void* AllocateAlignedMemory(size_t size,size_t alignment)
 {
-#ifdef _WIN32
+#ifdef _WIN64
     void* ptr =  _aligned_malloc(size,alignment);
 #else
     void* ptr = nullptr;
@@ -120,7 +120,7 @@ void FreeMemoryPages(void* ptr, size_t size)
 {
     if (ptr)
     {
-#ifdef _WIN32
+#ifdef _WIN64
         if (!VirtualFree(ptr, 0, MEM_RELEASE))
             LOG_ERROR(Common_Memory, "FreeMemoryPages failed!\n%s", GetLastErrorMsg());
 #else
@@ -133,7 +133,7 @@ void FreeAlignedMemory(void* ptr)
 {
     if (ptr)
     {
-#ifdef _WIN32
+#ifdef _WIN64
     _aligned_free(ptr);
 #else
     free(ptr);
@@ -143,7 +143,7 @@ void FreeAlignedMemory(void* ptr)
 
 void WriteProtectMemory(void* ptr, size_t size, bool allowExecute)
 {
-#ifdef _WIN32
+#ifdef _WIN64
     DWORD oldValue;
     if (!VirtualProtect(ptr, size, allowExecute ? PAGE_EXECUTE_READ : PAGE_READONLY, &oldValue))
         LOG_ERROR(Common_Memory, "WriteProtectMemory failed!\n%s", GetLastErrorMsg());
@@ -154,7 +154,7 @@ void WriteProtectMemory(void* ptr, size_t size, bool allowExecute)
 
 void UnWriteProtectMemory(void* ptr, size_t size, bool allowExecute)
 {
-#ifdef _WIN32
+#ifdef _WIN64
     DWORD oldValue;
     if (!VirtualProtect(ptr, size, allowExecute ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE, &oldValue))
         LOG_ERROR(Common_Memory, "UnWriteProtectMemory failed!\n%s", GetLastErrorMsg());
@@ -165,7 +165,7 @@ void UnWriteProtectMemory(void* ptr, size_t size, bool allowExecute)
 
 std::string MemUsage()
 {
-#ifdef _WIN32
+#ifdef _WIN64
 #pragma comment(lib, "psapi")
     DWORD processID = GetCurrentProcessId();
     HANDLE hProcess;
