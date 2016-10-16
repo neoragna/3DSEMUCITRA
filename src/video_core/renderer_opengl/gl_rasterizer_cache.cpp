@@ -232,6 +232,7 @@ CachedSurface* RasterizerCacheOpenGL::GetSurface(const CachedSurface& params, bo
     float exact_surface_goodness = -1.f;
 
     auto surface_interval = boost::icl::interval<PAddr>::right_open(params.addr, params.addr + params_size);
+	if (boost::icl::is_empty(surface_interval)) return nullptr;
     auto range = surface_cache.equal_range(surface_interval);
     for (auto it = range.first; it != range.second; ++it) {
         for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2) {
@@ -406,6 +407,7 @@ CachedSurface* RasterizerCacheOpenGL::GetSurfaceRect(const CachedSurface& params
     float subrect_surface_goodness = -1.f;
 
     auto surface_interval = boost::icl::interval<PAddr>::right_open(params.addr, params.addr + params_size);
+	if (boost::icl::is_empty(surface_interval)) return nullptr;
     auto cache_upper_bound = surface_cache.upper_bound(surface_interval);
     for (auto it = surface_cache.lower_bound(surface_interval); it != cache_upper_bound; ++it) {
         for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2) {
@@ -565,6 +567,7 @@ std::tuple<CachedSurface*, CachedSurface*, MathUtil::Rectangle<int>> RasterizerC
 
 CachedSurface* RasterizerCacheOpenGL::TryGetFillSurface(const GPU::Regs::MemoryFillConfig& config) {
     auto surface_interval = boost::icl::interval<PAddr>::right_open(config.GetStartAddress(), config.GetEndAddress());
+	if (boost::icl::is_empty(surface_interval)) return nullptr;
     auto range = surface_cache.equal_range(surface_interval);
     for (auto it = range.first; it != range.second; ++it) {
         for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2) {
@@ -689,6 +692,7 @@ void RasterizerCacheOpenGL::FlushRegion(PAddr addr, u32 size, const CachedSurfac
     std::unordered_set<std::shared_ptr<CachedSurface>> touching_surfaces;
 
     auto surface_interval = boost::icl::interval<PAddr>::right_open(addr, addr + size);
+	if (boost::icl::is_empty(surface_interval)) return;
     auto cache_upper_bound = surface_cache.upper_bound(surface_interval);
     for (auto it = surface_cache.lower_bound(surface_interval); it != cache_upper_bound; ++it) {
         std::copy_if(it->second.begin(), it->second.end(), std::inserter(touching_surfaces, touching_surfaces.end()),
