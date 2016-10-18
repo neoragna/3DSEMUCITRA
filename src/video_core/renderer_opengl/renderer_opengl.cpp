@@ -471,10 +471,16 @@ void RendererOpenGL::DrawScreens() {
 		float w = (float)layout.bottom_screen.GetWidth() / 1.5f;
 		DrawSingleScreenRotated(screen_infos[2], l,
 			(float)layout.bottom_screen.top, w,
-			(float)layout.bottom_screen.GetHeight(), true, true);
+			(float)layout.bottom_screen.GetHeight(), true, false);
+		DrawSingleScreenRotated(screen_infos[2], l,
+			(float)layout.bottom_screen.top, w,
+			(float)layout.bottom_screen.GetHeight(), false, true);
 		DrawSingleScreenRotated(screen_infos[2], (float)layout.width / 3.0f + l,
 			(float)layout.bottom_screen.top, w,
-			(float)layout.bottom_screen.GetHeight(), true, true);
+			(float)layout.bottom_screen.GetHeight(), true, false);
+		DrawSingleScreenRotated(screen_infos[2], (float)layout.width / 3.0f + l,
+			(float)layout.bottom_screen.top, w,
+			(float)layout.bottom_screen.GetHeight(), false, true);
 		// Draw some cursor for touch
 		auto x = (float)(float)VideoCore::kScreenBottomWidth * w + l;
 		auto y = layout.bottom_screen.top -
@@ -486,16 +492,13 @@ void RendererOpenGL::DrawScreens() {
 			glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
 			glScissor(x, y - 1, 1, 3);
-		    }{
-				glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-			    }{
-				glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-			}
-			glClear(GL_COLOR_BUFFER_BIT);
-			x += (float)layout.width / 2.0f;
+			glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+			glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		}
+		glClear(GL_COLOR_BUFFER_BIT);
+		x += (float)layout.width / 2.0f;
 		glDisable(GL_SCISSOR_TEST);
-	
+	}
 	m_current_frame++;
 }
 
