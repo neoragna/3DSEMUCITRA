@@ -58,6 +58,8 @@ public:
     ResultCode Format(const Path& path, const FileSys::ArchiveFormatInfo& format_info) override;
     ResultVal<ArchiveFormatInfo> GetFormatInfo(const Path& path) const override;
 
+    friend class ArchiveFactory_SDMCWriteOnly;
+
 private:
     std::string sdmc_directory;
 };
