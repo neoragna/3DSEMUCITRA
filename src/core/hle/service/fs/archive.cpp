@@ -18,6 +18,7 @@
 #include "core/file_sys/archive_savedata.h"
 #include "core/file_sys/archive_savedatacheck.h"
 #include "core/file_sys/archive_sdmc.h"
+#include "core/file_sys/archive_sdmcwriteonly.h"
 #include "core/file_sys/archive_systemsavedata.h"
 #include "core/file_sys/directory_backend.h"
 #include "core/file_sys/file_backend.h"
@@ -520,11 +521,15 @@ void RegisterArchiveTypes() {
     std::string sdmc_directory = FileUtil::GetUserPath(D_SDMC_IDX);
     std::string nand_directory = FileUtil::GetUserPath(D_NAND_IDX);
     auto sdmc_factory = std::make_unique<FileSys::ArchiveFactory_SDMC>(sdmc_directory);
-    if (sdmc_factory->Initialize())
+    if (sdmc_factory->Initialize()) {
+        auto sdmcwriteonly_factory =
+            std::make_unique<FileSys::ArchiveFactory_SDMCWriteOnly>(*sdmc_factory);
         RegisterArchiveType(std::move(sdmc_factory), ArchiveIdCode::SDMC);
-    else
+        RegisterArchiveType(std::move(sdmcwriteonly_factory), ArchiveIdCode::SDMCWriteOnly);
+    } else {
         LOG_ERROR(Service_FS, "Can't instantiate SDMC archive with path %s",
                   sdmc_directory.c_str());
+    }
 
     // Create the SaveData archive
     auto savedata_factory = std::make_unique<FileSys::ArchiveFactory_SaveData>(sdmc_directory);
