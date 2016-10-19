@@ -45,6 +45,13 @@ ResultCode IVFCArchive::DeleteDirectory(const Path& path) const {
     return ResultCode(-1);
 }
 
+ResultCode IVFCArchive::DeleteDirectoryRecursively(const Path& path) const {
+    LOG_CRITICAL(Service_FS, "Attempted to delete a directory from an IVFC archive (%s).",
+                 GetName().c_str());
+    // TODO: Use correct error code
+    return ResultCode(-1);
+}
+
 ResultCode IVFCArchive::CreateFile(const Path& path, u64 size) const {
     LOG_CRITICAL(Service_FS, "Attempted to create a file in an IVFC archive (%s).",
                  GetName().c_str());

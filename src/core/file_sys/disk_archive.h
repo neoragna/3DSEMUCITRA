@@ -37,6 +37,7 @@ public:
     ResultCode DeleteFile(const Path& path) const override;
     ResultCode RenameFile(const Path& src_path, const Path& dest_path) const override;
     ResultCode DeleteDirectory(const Path& path) const override;
+	ResultCode DeleteDirectoryRecursively(const Path& path) const override;
     ResultCode CreateFile(const Path& path, u64 size) const override;
 	ResultCode CreateDirectory(const Path& path) const override;
 	ResultCode RenameDirectory(const Path& src_path, const Path& dest_path) const override;
