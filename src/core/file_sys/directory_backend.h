@@ -41,6 +41,12 @@ public:
     virtual ~DirectoryBackend() { }
 
     /**
+    * Open the directory
+    * @return true if the directory opened correctly
+    */
+    virtual bool Open() = 0;
+
+    /**
      * List files contained in the directory
      * @param count Number of entries to return at once in entries
      * @param entries Buffer to read data into

@@ -31,18 +31,16 @@ ResultCode IVFCArchive::DeleteFile(const Path& path) const {
                       ErrorLevel::Status);
 }
 
-ResultCode IVFCArchive::RenameFile(const Path& src_path, const Path& dest_path) const {
+bool IVFCArchive::RenameFile(const Path& src_path, const Path& dest_path) const {
     LOG_CRITICAL(Service_FS, "Attempted to rename a file within an IVFC archive (%s).",
                  GetName().c_str());
-    // TODO: Use correct error code
-    return ResultCode(-1);
+    return false;
 }
 
-ResultCode IVFCArchive::DeleteDirectory(const Path& path) const {
+bool IVFCArchive::DeleteDirectory(const Path& path) const {
     LOG_CRITICAL(Service_FS, "Attempted to delete a directory from an IVFC archive (%s).",
                  GetName().c_str());
-    // TODO: Use correct error code
-    return ResultCode(-1);
+    return false;
 }
 
 ResultCode IVFCArchive::CreateFile(const Path& path, u64 size) const {
@@ -53,22 +51,20 @@ ResultCode IVFCArchive::CreateFile(const Path& path, u64 size) const {
                       ErrorLevel::Permanent);
 }
 
-ResultCode IVFCArchive::CreateDirectory(const Path& path) const {
+bool IVFCArchive::CreateDirectory(const Path& path) const {
     LOG_CRITICAL(Service_FS, "Attempted to create a directory in an IVFC archive (%s).",
                  GetName().c_str());
-    // TODO: Use correct error code
-    return ResultCode(-1);
+    return false;
 }
 
-ResultCode IVFCArchive::RenameDirectory(const Path& src_path, const Path& dest_path) const {
+bool IVFCArchive::RenameDirectory(const Path& src_path, const Path& dest_path) const {
     LOG_CRITICAL(Service_FS, "Attempted to rename a file within an IVFC archive (%s).",
                  GetName().c_str());
-    // TODO: Use correct error code
-    return ResultCode(-1);
+    return false;
 }
 
-ResultVal<std::unique_ptr<DirectoryBackend>> IVFCArchive::OpenDirectory(const Path& path) const {
-    return MakeResult<std::unique_ptr<DirectoryBackend>>(std::make_unique<IVFCDirectory>());
+std::unique_ptr<DirectoryBackend> IVFCArchive::OpenDirectory(const Path& path) const {
+    return std::make_unique<IVFCDirectory>();
 }
 
 u64 IVFCArchive::GetFreeBytes() const {
