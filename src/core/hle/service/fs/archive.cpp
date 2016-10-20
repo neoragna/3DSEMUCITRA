@@ -401,15 +401,6 @@ ResultCode DeleteDirectoryFromArchive(ArchiveHandle archive_handle, const FileSy
     return archive->DeleteDirectory(path);
 }
 
-ResultCode DeleteDirectoryRecursivelyFromArchive(ArchiveHandle archive_handle,
-                                                 const FileSys::Path& path) {
-    ArchiveBackend* archive = GetArchive(archive_handle);
-    if (archive == nullptr)
-        return ERR_INVALID_ARCHIVE_HANDLE;
-
-    return archive->DeleteDirectoryRecursively(path);
-}
-
 ResultCode CreateFileInArchive(ArchiveHandle archive_handle, const FileSys::Path& path,
                                u64 file_size) {
     ArchiveBackend* archive = GetArchive(archive_handle);

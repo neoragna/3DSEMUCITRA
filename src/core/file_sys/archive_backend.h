@@ -112,13 +112,6 @@ public:
      */
     virtual ResultCode DeleteDirectory(const Path& path) const = 0;
 
-     /**
-     * Delete a directory specified by its path and anything under it
-     * @param path Path relative to the archive
-     * @return Result of the operation
-     */
-    virtual ResultCode DeleteDirectoryRecursively(const Path& path) const = 0;
-
     /**
      * Create a file specified by its path
      * @param path Path relative to the Archive

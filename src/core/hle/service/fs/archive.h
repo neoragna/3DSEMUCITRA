@@ -145,14 +145,6 @@ ResultCode RenameFileBetweenArchives(ArchiveHandle src_archive_handle,
  */
 ResultCode DeleteDirectoryFromArchive(ArchiveHandle archive_handle, const FileSys::Path& path);
 
- /**
- * Delete a Directory and anything under it from an Archive
- * @param archive_handle Handle to an open Archive object
- * @param path Path to the Directory inside of the Archive
- * @return Whether deletion succeeded
- */
-ResultCode DeleteDirectoryRecursivelyFromArchive(ArchiveHandle archive_handle,
-                                                 const FileSys::Path& path);
 /**
  * Create a File in an Archive
  * @param archive_handle Handle to an open Archive object

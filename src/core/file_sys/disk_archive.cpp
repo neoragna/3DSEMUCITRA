@@ -86,18 +86,11 @@ ResultCode DiskArchive::RenameFile(const Path& src_path, const Path& dest_path) 
                       ErrorSummary::NothingHappened, ErrorLevel::Status);
 }
 
-ResultCode DiskArchive::DeleteDirectory(const Path& path) const {
-    if (FileUtil::DeleteDir(mount_point + path.AsString()))
-        return RESULT_SUCCESS;
-    return ResultCode(ErrorDescription::NoData, ErrorModule::FS, // TODO: verify description
-                      ErrorSummary::Canceled, ErrorLevel::Status);
-}
-
-ResultCode DiskArchive::DeleteDirectoryRecursively(const Path& path) const {
-    if (FileUtil::DeleteDirRecursively(mount_point + path.AsString()))
-        return RESULT_SUCCESS;
-    return ResultCode(ErrorDescription::NoData, ErrorModule::FS, // TODO: verify description
-                      ErrorSummary::Canceled, ErrorLevel::Status);
+	ResultCode DiskArchive::DeleteDirectory(const Path& path) const {
+		if (FileUtil::DeleteDir(mount_point + path.AsString()))
+			 return RESULT_SUCCESS;
+		return ResultCode(ErrorDescription::NoData, ErrorModule::FS, // TODO: verify description
+			ErrorSummary::Canceled, ErrorLevel::Status);
 }
 
 ResultCode DiskArchive::CreateFile(const FileSys::Path& path, u64 size) const {
