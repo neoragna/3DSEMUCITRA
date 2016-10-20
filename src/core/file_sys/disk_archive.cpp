@@ -16,7 +16,7 @@
 namespace FileSys {
 
 ResultVal<size_t> DiskFile::Read(const u64 offset, const size_t length, u8* buffer) const {
-    if (!mode.read_flag && !mode.write_flag)
+    if (!mode.read_flag)
         return ResultCode(ErrorDescription::FS_InvalidOpenFlags, ErrorModule::FS,
                           ErrorSummary::Canceled, ErrorLevel::Status);
 
