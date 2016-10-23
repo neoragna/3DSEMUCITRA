@@ -81,6 +81,9 @@ bg_green =
 
 [Audio]
 # Which audio output engine to use.
+# 0: None, 1: SDL2
+output_sink =
+
 # auto (default): Auto-select, null: No audio output, sdl2: SDL2 (if available)
 output_engine =
   

@@ -30,7 +30,8 @@ public:
     }
 
 private:
-    StereoFrame16 current_frame = {};
+    size_t mixer_id;
+    StereoFrame16 current_frame;
 
     using OutputFormat = DspConfiguration::OutputFormat;
 
@@ -39,7 +40,7 @@ private:
 
         bool mixer1_enabled = false;
         bool mixer2_enabled = false;
-        std::array<QuadFrame32, 3> intermediate_mix_buffer = {};
+        std::array<QuadFrame32, 3> intermediate_mix_buffer = {{}};
 
         OutputFormat output_format = OutputFormat::Stereo;
 
@@ -50,7 +51,7 @@ private:
     /// INTERNAL: Read samples from shared memory that have been modified by the ARM11.
     void AuxReturn(const IntermediateMixSamples& read_samples);
     /// INTERNAL: Write samples to shared memory for the ARM11 to modify.
-    void AuxSend(IntermediateMixSamples& write_samples, const std::array<QuadFrame32, 3>& input);
+    void AuxSend(IntermediateMixSamples& write_samples, const std::array<QuadFrame32, 3> input);
     /// INTERNAL: Mix current_frame.
     void MixCurrentFrame();
     /// INTERNAL: Downmix from quadraphonic to stereo based on status.output_format and accumulate into current_frame.

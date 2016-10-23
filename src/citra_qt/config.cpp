@@ -62,6 +62,7 @@ void Config::ReadValues() {
     qt_config->endGroup();
 
     qt_config->beginGroup("Audio");
+    Settings::values.sink_id = qt_config->value("output_sink", -1).toInt();
     Settings::values.sink_id = qt_config->value("output_engine", "auto").toString().toStdString();
 	Settings::values.audio_device_id = qt_config->value("output_device", "auto").toString().toStdString();
 	Settings::values.enable_audio_stretching = qt_config->value("enable_audio_stretching", true).toBool();
