@@ -11,7 +11,7 @@
 #include "common/string_util.h"
 
 #include "core/file_sys/archive_systemsavedata.h"
-#include "core/file_sys/disk_archive.h"
+#include "core/file_sys/savedata_archive.h"
 #include "core/hle/service/fs/archive.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,7 +59,7 @@ ResultVal<std::unique_ptr<ArchiveBackend>> ArchiveFactory_SystemSaveData::Open(c
         return ResultCode(ErrorDescription::FS_NotFormatted, ErrorModule::FS,
             ErrorSummary::InvalidState, ErrorLevel::Status);
     }
-    auto archive = std::make_unique<DiskArchive>(fullpath);
+    auto archive = std::make_unique<SaveDataArchive>(fullpath);
     return MakeResult<std::unique_ptr<ArchiveBackend>>(std::move(archive));
 }
 

@@ -32,7 +32,6 @@ PathParser::PathParser(const Path& path) {
         return;
     }
 
-    // TODO working?
     Common::SplitString(path_string, '/', path_sequence);
 
     auto begin = path_sequence.begin();
@@ -40,21 +39,22 @@ PathParser::PathParser(const Path& path) {
     end = std::remove_if(begin, end, [](std::string& str) { return str == "" || str == "."; });
     path_sequence = std::vector<std::string>(begin, end);
 
-    is_valid = true;
-}
-
-bool PathParser::IsOutOfBounds() {
+    // checks if the path is out of bounds.
     int level = 0;
     for (auto& node : path_sequence) {
         if (node == "..") {
             --level;
-            if (level < 0)
-                return true;
+            if (level < 0) {
+                is_valid = false;
+                return;
+            }
         } else {
             ++level;
         }
     }
-    return false;
+
+    is_valid = true;
+    is_root = level == 0;
 }
 
 PathParser::HostStatus PathParser::GetHostStatus(const std::string& mount_point) {
@@ -66,7 +66,9 @@ PathParser::HostStatus PathParser::GetHostStatus(const std::string& mount_point)
     }
 
     for (auto iter = path_sequence.begin(); iter != path_sequence.end() - 1; iter++) {
-        path += "/" + *iter;
+        if (path.back() != '/')
+            path += '/';
+        path += *iter;
 
         if (!FileUtil::Exists(path))
             return PathNotFound;
@@ -81,6 +83,16 @@ PathParser::HostStatus PathParser::GetHostStatus(const std::string& mount_point)
     if (FileUtil::IsDirectory(path))
         return DirectoryFound;
     return FileFound;
+}
+
+std::string PathParser::BuildHostPath(const std::string& mount_point) {
+    std::string path = mount_point;
+    for (auto& node : path_sequence) {
+        if (path.back() != '/')
+            path += '/';
+        path += node;
+    }
+    return path;
 }
 
 } // namespace FileSys
