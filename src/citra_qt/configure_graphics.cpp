@@ -26,6 +26,8 @@ void ConfigureGraphics::setConfiguration() {
     ui->toggle_shader_jit->setChecked(Settings::values.use_shader_jit);
     ui->toggle_scaled_resolution->setChecked(Settings::values.use_scaled_resolution);
     ui->toggle_vsync->setChecked(Settings::values.use_vsync);
+	ui->combo_filtering->setCurrentIndex(Settings::values.tex_filter);
+	ui->slider_filtering_scale->setValue(Settings::values.tex_filter_scaling);
 }
 
 void ConfigureGraphics::applyConfiguration() {
@@ -33,5 +35,7 @@ void ConfigureGraphics::applyConfiguration() {
     Settings::values.use_shader_jit = ui->toggle_shader_jit->isChecked();
     Settings::values.use_scaled_resolution = ui->toggle_scaled_resolution->isChecked();
     Settings::values.use_vsync = ui->toggle_vsync->isChecked();
+	Settings::values.tex_filter = ui->combo_filtering->currentIndex();
+	Settings::values.tex_filter_scaling = ui->slider_filtering_scale->value();
     Settings::Apply();
 }

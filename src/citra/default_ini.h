@@ -79,6 +79,14 @@ bg_red =
 bg_blue =
 bg_green =
 
+# What texture filter to use
+# 0 (default): Nothing, 1: xbRZ
+tex_filter =
+
+# What texture filtering size to use (if enabled)
+# 1 (default): Disabled, 2-6: Enabled at x times scaling
+tex_filter_scaling =
+
 [Audio]
 # Which audio output engine to use.
 # auto (default): Auto-select, null: No audio output, sdl2: SDL2 (if available)
