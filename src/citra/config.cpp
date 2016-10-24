@@ -83,7 +83,6 @@ void Config::ReadValues() {
     Settings::values.swap_screen = sdl2_config->GetBoolean("Layout", "swap_screen", false);
 
     // Audio
-    Settings::values.sink_id = sdl2_config->GetInteger("Audio", "output_sink", -1);
     Settings::values.sink_id = sdl2_config->Get("Audio", "output_engine", "auto");
 	Settings::values.audio_device_id = sdl2_config->Get("Audio", "output_device", "auto");
     Settings::values.enable_audio_stretching = sdl2_config->GetBoolean("Audio", "enable_audio_stretching", true);

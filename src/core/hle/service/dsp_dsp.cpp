@@ -89,14 +89,6 @@ void SignalPipeInterrupt(DspPipe pipe) {
     interrupt_events.Signal(InterruptType::Pipe, pipe);
 }
 
-void ResetSemaphore() {
-    semaphore_event->Clear();
-}
-
-bool IsSemaphoreSignalled() {
-    return semaphore_event->signaled;
-}
-
 /**
  * DSP_DSP::ConvertProcessAddressFromDspDram service function
  *  Inputs:
