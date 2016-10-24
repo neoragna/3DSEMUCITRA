@@ -580,7 +580,8 @@ static void StartConversion(Service::Interface* self) {
 
     HW::Y2R::PerformConversion(conversion);
 
-    completion_event->Signal();
+	// completion_event->Delay(8);
+	completion_event->ReSignal();
 
     cmd_buff[0] = IPC::MakeHeader(0x26, 1, 0);
     cmd_buff[1] = RESULT_SUCCESS.raw;
@@ -762,7 +763,7 @@ const Interface::FunctionInfo FunctionTable[] = {
 // Interface class
 
 Interface::Interface() {
-    completion_event = Kernel::Event::Create(Kernel::ResetType::Sticky, "Y2R:Completed");
+	completion_event = Kernel::Event::Create(Kernel::ResetType::Sticky, "Y2R:Completed");
     std::memset(&conversion, 0, sizeof(conversion));
 
     Register(FunctionTable);

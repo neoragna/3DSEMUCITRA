@@ -223,6 +223,7 @@ static ResultCode ConnectToPort(Handle* out_handle, const char* port_name) {
     CASCADE_RESULT(*out_handle, Kernel::g_handle_table.Create(it->second));
     return RESULT_SUCCESS;
 }
+static void SleepThread(s8 nanoseconds);
 
 /// Synchronize to an OS service
 static ResultCode SendSyncRequest(Handle handle) {
@@ -233,7 +234,9 @@ static ResultCode SendSyncRequest(Handle handle) {
 
     LOG_TRACE(Kernel_SVC, "called handle=0x%08X(%s)", handle, session->GetName().c_str());
 
-    return session->SyncRequest().Code();
+	auto ret = session->SyncRequest().Code();
+    // SleepThread(0);
+	return ret;
 }
 
 /// Close a handle

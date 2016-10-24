@@ -40,7 +40,7 @@ void WaitObject::WakeupAllWaitingThreads() {
 
     waiting_threads.clear();
 
-    HLE::Reschedule(__func__);
+	// HLE::Reschedule(__func__);
 }
 
 const std::vector<SharedPtr<Thread>>& WaitObject::GetWaitingThreads() const {
