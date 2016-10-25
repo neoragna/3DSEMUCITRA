@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "common/common_paths.h"
 #include "common/file_util.h"
 #include "core/cheat_core.h"
 #include "core/hle/kernel/process.h"
@@ -39,7 +40,7 @@ namespace CheatEngine {
 static std::string GetFilePath() {
     const auto program_id =
         Common::StringFromFormat("%016llX", Kernel::g_current_process->codeset->program_id);
-    return FileUtil::GetUserPath(D_USER_IDX) + "\\cheats\\" + program_id + ".txt";
+    return FileUtil::GetUserPath(D_USER_IDX) + "cheats" + DIR_SEP + program_id + ".txt";
 }
 CheatEngine::CheatEngine() {
     const auto file_path = GetFilePath();
