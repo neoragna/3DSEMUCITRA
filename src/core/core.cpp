@@ -50,7 +50,7 @@ void RunLoop(int tight_loop) {
 	}
 	else {
         g_app_core->Run(tight_loop);
-		n = ++n % 6000;
+		n = ++n % 3;
 		if (!n) {
 			HLE::Reschedule(__func__);
 		}
