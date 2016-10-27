@@ -53,6 +53,7 @@ static ScreencapPostPermission screen_capture_post_permission;
 
 /// Parameter data to be returned in the next call to Glance/ReceiveParameter
 static MessageParameter next_parameter;
+bool canceled = false;
 static std::array<MessageParameter, 0x4> MessageParameters;
 
 /**
@@ -96,6 +97,7 @@ static u32 GetMessageParametersIndex(const u32& app_id) {
 
 void SendParameter(const MessageParameter& parameter) {
     next_parameter = parameter;
+	canceled = false;
     // Signal the event to let the application know that a new parameter is ready to be read
     parameter_event->Signal();
 }
@@ -478,6 +480,11 @@ void ReceiveParameter(Service::Interface* self) {
     u32 buffer_size = cmd_buff[2];
     VAddr buffer = cmd_buff[0x41];
 
+	if (canceled) {
+		cmd_buff[1] = -1;
+		return;
+	}
+
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
     cmd_buff[2] = next_parameter.sender_id;
     cmd_buff[3] = next_parameter.signal; // Signal type
@@ -499,6 +506,11 @@ void GlanceParameter(Service::Interface* self) {
     u32 app_id = cmd_buff[1];
     u32 buffer_size = cmd_buff[2];
     VAddr buffer = cmd_buff[0x41];
+
+	if (canceled) {
+		cmd_buff[1] = -1;
+		return;
+	}
 
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
     cmd_buff[2] = next_parameter.sender_id;
@@ -522,6 +534,8 @@ void CancelParameter(Service::Interface* self) {
     u32 sender_id      = cmd_buff[2];
     u32 check_receiver = cmd_buff[3] & 0xFF;
     u32 receiver_id    = cmd_buff[4];
+
+	canceled = true;
 
     cmd_buff[1] = RESULT_SUCCESS.raw; // No error
     cmd_buff[2] = 1; // Set to Success
